@@ -9,7 +9,8 @@
 
 ### 文档
 
-- README 改为双语入口：两个文件顶部互链（当前语言加粗），并补上 verify / license /
+- README 改为双语入口，**英文为默认**（`README.md`），中文移到 `README.zh-CN.md`；
+  两个文件顶部互链并各自标注当前语言，同时补上 verify / license /
   node / dsh / 工具数徽章；`docs/` 仍是中文，英文页明确标注这一点。
 - `npm run verify` 新增 `docs` 段：两个 README 必须互相链接、所有相对链接必须能落地、
   都必须出现包名——防止开关或改名之后留下死链。
@@ -74,7 +75,7 @@
   `@deepseek-ai/dsh-app-boot`，对每个已装本包的 profile 调 `loadProfileDirectory`，
   断言 `preset-reverse` 行真的进了组合——这是离线 `verify` 查不到的那一层。
 - 文档：`docs/architecture.md`（装载链路、realm、`!!js` 求值、兼容性门槛）、
-  `docs/troubleshooting.md`（静默失败路径与实测数据）、`README.en.md`。
+  `docs/troubleshooting.md`（静默失败路径与实测数据）、`README.zh-CN.md`。
 - 包图标 `icon.png`。
 
 ### 变更

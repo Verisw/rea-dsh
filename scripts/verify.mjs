@@ -90,13 +90,13 @@ else bad('every npm script target exists', brokenScripts.map((entry) => `${entry
 // ── 1b. the two READMEs stay in step ───────────────────────────────────────
 group('docs');
 
-const readmes = ['README.md', 'README.en.md'];
+const readmes = ['README.md', 'README.zh-CN.md'];
 const texts = Object.fromEntries(readmes.map((name) => [name, readFileSync(join(root, name), 'utf8')]));
 
-const switchers = [['README.md', 'README.en.md'], ['README.en.md', 'README.md']].filter(
+const switchers = [['README.md', 'README.zh-CN.md'], ['README.zh-CN.md', 'README.md']].filter(
   ([from, to]) => !texts[from].includes('](' + to + ')'),
 );
-if (switchers.length === 0) ok('each README links the other', 'README.md <-> README.en.md');
+if (switchers.length === 0) ok('each README links the other', 'README.md <-> README.zh-CN.md');
 else bad('each README links the other', switchers.map(([from, to]) => from + ' -> ' + to).join(', '));
 
 const linkPattern = /\]\(([^)\s]+)\)/g;
@@ -112,6 +112,11 @@ for (const name of readmes) {
 }
 if (dead.length === 0) ok('every relative link in the READMEs resolves', readmes.join(', '));
 else bad('every relative link in the READMEs resolves', dead.join(', '));
+
+const labels = { 'README.md': '**English**', 'README.zh-CN.md': '**简体中文**' };
+const mislabelled = readmes.filter((name) => !texts[name].includes(labels[name]));
+if (mislabelled.length === 0) ok('each README announces its own language', 'English / 简体中文');
+else bad('each README announces its own language', mislabelled.join(', '));
 
 if (readmes.every((name) => texts[name].includes(pkg.name))) ok('both READMEs name the package', pkg.name);
 else bad('both READMEs name the package', pkg.name);

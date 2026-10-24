@@ -17,7 +17,8 @@
   ],
   "type": "module",
   "bin": {
-    "dsh-rea-setup": "scripts/setup.mjs"
+    "dsh-rea-setup": "scripts/setup.mjs",
+    "dsh-rea-reverse-preset": "scripts/setup.mjs"
   },
   "license": "MIT",
   "icon": "./icon.png",

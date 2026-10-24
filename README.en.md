@@ -44,7 +44,7 @@ It checks node / dsh versions and local profiles, installs into each surface, pr
 Java / IDA, runs the checks, and prints a restart list. No questions, and re-running is idempotent.
 
 ```sh
-npx -y dsh-rea-reverse-preset setup --check   # report only
+npx -y dsh-rea-reverse-preset --check         # report only
 npm run setup -- --write-env                  # write probed engine paths into ~/.zshrc
 npm run setup -- --warm                       # fetch REA now and build the tool manifest
 npm run setup -- --uninstall                  # remove from every surface
@@ -61,6 +61,10 @@ npm run setup -- --uninstall                  # remove from every surface
 
 The desktop app and `dsh web` are separate profiles — installing into one affects only that surface.
 The desktop profile must exist first (the app creates it), so quit the app before installing.
+
+`dsh plugin` itself needs Node >= 22.18 / >= 24: earlier Node versions lack
+`import.meta.main`, so the command exits 0 without doing anything. `npm run setup`
+probes this; see [docs/troubleshooting.md](docs/troubleshooting.md) §10 (zh).
 
 Check what is installed:
 

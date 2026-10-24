@@ -147,15 +147,18 @@
           # `bundledSkillDir` must be absolute — a relative value in `config` is
           # never resolved by anything, and the process working directory would
           # silently decide whether the skill is found. It therefore locates
-          # itself: first as an installed package next to the profile, then as
-          # `../skills` beside this composition file (the dsh-tui shape). When
-          # every candidate misses, the key is dropped and the mode simply runs
-          # with one skill fewer; docs/troubleshooting.md says how to tell.
+          # itself from the composition anchor only (`ctx.baseUrl`): first as an
+          # installed package next to the profile, then as `../skills` beside
+          # this composition file (the dsh-tui shape). `process.cwd()` is
+          # deliberately NOT a candidate — the launch directory must never decide
+          # whether a skill loads. When every candidate misses, the key is
+          # dropped and the mode simply runs with one skill fewer;
+          # docs/troubleshooting.md says how to tell.
           - id: skill-filesystem
             name: '@deepseek-ai/dsh-skill-filesystem'
             config:
               bundledSkillDir: !!js >-
-                (() => { const { createRequire } = process.getBuiltinModule('node:module'); const { dirname, join } = process.getBuiltinModule('node:path'); const { existsSync } = process.getBuiltinModule('node:fs'); const { fileURLToPath } = process.getBuiltinModule('node:url'); const candidates = []; for (const anchor of [ctx.baseUrl, process.cwd() + '/']) { if (!anchor) continue; try { candidates.push(join(dirname(createRequire(anchor).resolve('dsh-rea-reverse-preset/package.json')), 'skills')); } catch {} } if (ctx.baseUrl) { try { candidates.push(fileURLToPath(new URL('../skills/', ctx.baseUrl))); } catch {} } return candidates.find((candidate) => existsSync(candidate)); })()
+                (() => { const { createRequire } = process.getBuiltinModule('node:module'); const { dirname, join } = process.getBuiltinModule('node:path'); const { existsSync } = process.getBuiltinModule('node:fs'); const { fileURLToPath } = process.getBuiltinModule('node:url'); const candidates = []; if (ctx.baseUrl) { try { candidates.push(join(dirname(createRequire(ctx.baseUrl).resolve('dsh-rea-reverse-preset/package.json')), 'skills')); } catch {} try { candidates.push(fileURLToPath(new URL('../skills/', ctx.baseUrl))); } catch {} } return candidates.find((candidate) => existsSync(candidate)); })()
           - id: tool-skill
             name: '@deepseek-ai/dsh-tool-skill'
 

@@ -132,10 +132,19 @@ function hostPackage() {
 
 const isCheckout = fs.existsSync(path.join(repoRoot, '.git'));
 const host = hostPackage();
-const hasDshCli = capture('dsh', ['--version']).status === 0;
+
+// `dsh` 的入口是 `if (import.meta.main) await runCli()`（lib/bin.js 末尾）。Node 23.x
+// 与 24.2 之前的版本没有这个属性，CLI 于是什么都不做却返回 0 —— 看起来装成功，
+// 实际没装。所以“有没有 dsh 命令”必须连同运行它的 Node 是否支持 dispatch 一起看。
+const cliDispatch = typeof import.meta.main !== 'undefined';
+const hasDshCli = cliDispatch && capture('dsh', ['--version']).status === 0;
 if (host) ok('dsh ' + host.version + '  (' + host.file + ')');
 else if (hasDshCli) ok('dsh CLI 在 PATH 上（版本没读到）');
 else warn('PATH 上没有 dsh 命令（软链方式仍然可用；dsh plugin 方式不可用）');
+if (host && !cliDispatch) {
+  warn('当前 Node ' + process.versions.node + ' 缺 import.meta.main，dsh 命令行会静默退出（exit 0 却什么都没做）');
+  line('       要用 dsh plugin 安装，换 Node >= 22.18 / >= 24 再跑；或改成 checkout 软链方式。');
+}
 
 if (isCheckout) ok('来源：git checkout ' + repoRoot + ' -> 软链安装，改代码即时生效');
 else ok('来源：安装包 ' + repoRoot + ' -> 用 dsh plugin 安装 ' + pkg.name + '@' + pkg.version);
@@ -175,7 +184,10 @@ if (checkOnly) {
       problems += 1;
     }
   } else if (!hasDshCli) {
-    fail('不在 checkout 里，又没有 dsh CLI：没法安装。用 dsh plugin --profile <name> add ' + pkg.name + ' 手动装。');
+    fail('不在 checkout 里，又没法用 dsh CLI：装不了。');
+    line(host && !cliDispatch
+      ? '       原因：当前 Node ' + process.versions.node + ' 缺 import.meta.main，dsh 命令行空转。换 Node >= 22.18 / >= 24 再跑。'
+      : '       原因：PATH 上没有 dsh 命令。手动装：dsh plugin --profile <name> add ' + pkg.name + '。');
     problems += 1;
   } else if (!dryRun) {
     for (const dir of found) {

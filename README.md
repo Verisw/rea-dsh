@@ -42,7 +42,7 @@ npm run setup                         # 从 checkout 跑
 跑校验 → 打印重启清单。中途不需要回答任何问题，重复执行是幂等的。
 
 ```sh
-npx -y dsh-rea-reverse-preset setup --check   # 只看状态，不动文件
+npx -y dsh-rea-reverse-preset --check         # 只看状态，不动文件
 npm run setup -- --write-env                  # 把探到的引擎路径写进 ~/.zshrc
 npm run setup -- --warm                       # 预热：把 REA 下好，并生成工具清单缓存
 npm run setup -- --uninstall                  # 从所有界面卸掉
@@ -59,6 +59,10 @@ npm run setup -- --uninstall                  # 从所有界面卸掉
 
 桌面 App 与 `dsh web` 是两个独立 profile，各装各的，装哪个只影响哪个界面。
 桌面 profile 需要 App 自己先创建过一次——装之前先完全退出 App。
+
+`dsh plugin` 本身要求 Node ≥ 22.18 / ≥ 24（更早的 Node 缺少 `import.meta.main`，
+命令会静默退出、exit 0 但什么都没装）。`npm run setup` 会先探这一步；症状与处理见
+[docs/troubleshooting.md](docs/troubleshooting.md) §10。
 
 看本机装没装：
 

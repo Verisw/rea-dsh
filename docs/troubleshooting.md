@@ -145,6 +145,19 @@ npm run verify     # 看 bundledSkillDir 那三行
 ps -Ao pid,ppid,etime,command | grep -E 'rea mcp|rea-lazy' | grep -v grep
 ```
 
+## 10. `dsh plugin add` 什么都不打印，也没装上
+
+`dsh` 的入口是 `if (import.meta.main) await runCli()`。Node 23.x 和 24.2 之前的
+版本没有 `import.meta.main`，CLI 于是**什么都不做却 exit 0**——看不出失败，profile
+里也没有任何变化。
+
+```sh
+node --input-type=module -e 'console.log(process.version, import.meta.main)'
+```
+
+看到 `undefined` 就是它。换 Node ≥ 22.18 或 ≥ 24 再跑，或改用仓库软链方式
+（`npm run link:all`），后者不经过 CLI。`npm run setup` 会先探这一步并给出警告。
+
 ---
 
 ## 收集证据

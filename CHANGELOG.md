@@ -70,6 +70,28 @@
   （`optional`，避免 npm 自动装宿主）。宿主升级到 0.3.x 时本包会被 `skippedBundles` 跳过，
   而不是破坏 profile。
 
+- `package.json` 增加同名 bin 别名 `dsh-rea-reverse-preset`（原先只有 `dsh-rea-setup`），
+  `npx -y dsh-rea-reverse-preset --check` 可直接跑；两个 bin 都指向 `scripts/setup.mjs`。
+
+### 修复
+
+- `bundledSkillDir` 去掉 `process.cwd()` 候选：从 npm 安装后的包里跑校验时，这个兜底会
+  猜出一个真实路径，与「落空就丢弃该键」的设计相反。现在只看组合锚点
+  （`ctx.baseUrl`：已装包 → 邻近 `../skills/`），启动目录不再决定技能是否加载。
+- `scripts/setup.mjs` 增加 `import.meta.main` 探测：Node 23.x 里 `dsh` 的入口守卫不成立，
+  `dsh plugin` 会静默 exit 0 而什么都没做。现在提前告警，并在 npm 安装通道上把原因写清楚。
+
+### 验证（发布前实测）
+
+- `npm pack` → 22 个文件 / 66 KB：`cordis.patch.yml`、`skills/`、`scripts/`（含转接层）、
+  `tui/`、`docs/`、`icon.png` 全在包内，无 `.git` 残留路径。
+- 把 tarball 用 `dsh plugin --profile web add file:…tgz` 装进全新 `DSH_HOME`：profile 自动
+  初始化、`dsh.profile.bundles` 自动追加、`loadProfileDirectory` 组合出
+  `preset reverse / 21 plugin rows`、`skippedBundles: []`。
+- 从安装副本（不是 checkout）跑 `scripts/verify.mjs`：RESULT PASS，39 项全过。
+- 从安装副本跑转接层（`process.execPath` + 相对锚点解析）：冷启动拉起 REA 1.4 s、
+  139 个工具入清单；热启动 `initialize` 61 ms / `tools/list` 80 ms，零 REA 进程。
+
 ### 已知问题
 
 - 全新机器首次启动仍会拉起一次 REA：没有清单就不知道有哪些工具。跑一次

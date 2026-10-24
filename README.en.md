@@ -1,213 +1,128 @@
 # dsh-rea-reverse-preset
 
-A reverse-engineering mode for [DeepSeek Harness (dsh)](https://github.com/deepseek-ai).
-It adds one preset — **Reverse Engineering Mode** — that mounts the
-[REA](https://github.com/morluto/rea) MCP toolset (~139 tools across Ghidra, Hopper, IDA and
-binary / Electron artifact analysis), a reverse-engineer persona, and a workflow skill built
-around "what is the evidence and what is the next experiment".
+A **reverse-engineering mode** for **DeepSeek Harness (dsh)**.
 
-- One npm package = one dsh **bundle** (`dsh.bundle.patch`); install with `dsh plugin add`.
-- It declares exactly one **preset** (`id: reverse`) whose body is 21 top-level rows / 34 plugin rows.
-- It never touches the host's permission surface, model routing, sandbox or persistence.
+It adds one entry to the dsh preset picker. Select it and the agent carries the reverse-engineering
+tooling of [REA](https://github.com/morluto/rea) (~139 tools over Ghidra / Hopper / IDA, binaries and
+Electron artifacts), a reverse-engineer persona, and an evidence-first analysis workflow skill — ready
+to work on a sample straight away.
 
----
+## What it does
 
-## Three layers, and why the preset is *not* a plugin
+- **Disassembly / decompilation** — Ghidra, Hopper and IDA through their headless or CLI entry points:
+  pseudocode, cross references, call graphs, function boundaries.
+- **Binary reconnaissance** — strings, symbols, sections, import/export tables, entropy, compiler fingerprints.
+- **Packaged artifacts** — Electron `.app` and asar, APK / IPA, JS bundles: unpack, then analyse.
+- **Cross-checking** — the same function compared across engines, so one decompiler cannot mislead you.
+- **Written findings** — notes written as evidence then conclusion, not as guesses.
 
-| Layer | What it is | Toggleable in the Plugins page |
-|---|---|---|
-| npm package `dsh-rea-reverse-preset` | a **bundle**: one `cordis.patch.yml` plus a `dsh.bundle.patch` field | yes (the bundle row) |
-| The `reverse` preset declaration | one `@deepseek-ai/dsh-agent-preset` config row | no — agent preset entries are read-only there |
-| The 34 rows inside the preset | real Cordis **plugins** (`mcp-rea`, `tool-bash`, …) | yes, when a row is uniquely addressable |
+A missing engine only removes its own group of tools; everything else keeps working.
 
-A preset has no entry module, exports nothing, runs no code of its own. It is a name plus a list
-of plugins, mounted as its own scope by the registry. The rows inside that scope are the plugins.
+## Why use it
 
----
+| Advantage | Detail |
+|---|---|
+| One command | `npm run setup` installs into every surface, probes engines, verifies, then tells you what to restart. |
+| One bundle, four surfaces | Desktop app, `dsh web`, dsh-tui and headless share the same bundle — no per-surface config. |
+| Leaves the host alone | It only adds a subtree to a preset; permissions, model routing, sandbox and persistence stay yours. |
+| Portable | No machine-specific paths; engine locations come from environment variables. |
+| Fails softly | If REA cannot start, the mode is still selectable — just without its tools. |
+| Clean uninstall | Remove the bundle and you are back to stock; the shipped composition is untouched. |
+| Self-checking | `npm run verify` checks structure and portability offline; `verify:profiles` replays the real host loading path. |
 
 ## Install
 
 ### One command (recommended)
 
 ```sh
-npm run setup                         # from a checkout
 npx -y dsh-rea-reverse-preset setup   # from the published package
+npm run setup                         # from a checkout
 ```
 
-It runs five steps without asking anything:
+It checks node / dsh versions and local profiles, installs into each surface, probes Hopper / Ghidra /
+Java / IDA, runs the checks, and prints a restart list. No questions, and re-running is idempotent.
 
-1. environment check — node, dsh version, which profiles exist here;
-2. install — symlink the checkout into every profile, or call `dsh plugin --profile <p> add`
-   when running from an installed package;
-3. probe analysis engines — Hopper / Ghidra / Java 21 / IDA — and print the `export` lines it
-   would use;
-4. verify — `verify` plus the real per-profile composition;
-5. finish — say exactly which surface to restart, and in what order to confirm.
+```sh
+npx -y dsh-rea-reverse-preset setup --check   # report only
+npm run setup -- --write-env                  # write probed engine paths into ~/.zshrc
+npm run setup -- --uninstall                  # remove from every surface
+```
 
-| Flag | Effect |
-|---|---|
-| (none) | install into every profile and verify |
-| `--check` | report only, touch nothing |
-| `--write-env` | write the probed engine paths into `~/.zshrc` (marked block, idempotent) |
-| `--warm` | pre-warm the REA npx cache (a minute or two cold, ~1.4 s warm) |
-| `--uninstall` | remove from every profile |
-| `--dry-run` | print what would happen |
+### Per surface, manually
 
-Use `npm run setup -- --check` — arguments after `--` belong to the script.
-
-### Manual
-
-One mechanism — a **bundle** — for all four profiles. Install once, restart that surface.
-
-| You use | profile | Install | Takes effect |
+| You use | profile | Command | Takes effect |
 |---|---|---|---|
-| Desktop app (Electron) | `desktop` | `dsh plugin --profile desktop add github:Verisw/rea-dsh` | quit and reopen the app |
-| `dsh web` (browser UI) | `web` | `dsh plugin --profile web add github:Verisw/rea-dsh` | restart `dsh web` |
-| `dsh -p` (headless) | `headless` | `dsh plugin --profile headless add github:Verisw/rea-dsh` | next run |
-| dsh-tui | `dsh-tui` | `dsh plugin --profile dsh-tui add github:Verisw/rea-dsh` | restart the TUI |
+| Desktop app | `desktop` | `dsh plugin --profile desktop add github:Verisw/rea-dsh` | Quit the app fully (Cmd+Q), reopen |
+| `dsh web` in a browser | `web` | `dsh plugin --profile web add github:Verisw/rea-dsh` | Restart `dsh web` |
+| dsh-tui in a terminal | `dsh-tui` | `dsh plugin --profile dsh-tui add github:Verisw/rea-dsh` | Restart the TUI |
+| `dsh -p` (scripts, headless) | `headless` | `dsh plugin --profile headless add github:Verisw/rea-dsh` | Next run picks it up |
 
-Desktop and web share the preset picker that `@deepseek-ai/dsh-web-app` inserts; each install just
-adds one row to that profile's registry. They are separate profiles (own `package.json`, own
-`node_modules`), so installing into one does not touch the other.
+The desktop app and `dsh web` are separate profiles — installing into one affects only that surface.
+The desktop profile must exist first (the app creates it), so quit the app before installing.
 
-See what this machine has:
-
-```sh
-node scripts/install.mjs        # list only, changes nothing
-```
-
-For local development, link the checkout straight into the profile (idempotent):
+Check what is installed:
 
 ```sh
-npm run link:all        # desktop + web + headless + dsh-tui
-npm run link:web        # just one
-npm run unlink:all      # remove from all
+node scripts/install.mjs
 ```
 
-`dsh plugin --profile <name>` initialises non-desktop profiles from their template; the desktop
-profile must be created by the app first, and the app must be fully quit while you install.
+## Use
 
-After restarting, ask the host itself what it composed:
+1. Restart that surface.
+2. `/preset` → **逆向工程模式** (reverse engineering), or `/preset reverse` directly.
+3. `/mcp` to confirm REA came up; its tools are named `mcp__rea__*`.
+4. Point it at a sample and say what you want to know — behaviour, protocol, validation logic, version diffs.
 
-```sh
-npm run verify:profiles
-```
+Two things worth knowing:
 
-```text
-host 0.2.0-rc.2 (/opt/homebrew/lib/node_modules/@deepseek-ai/dsh/package.json)
-PASS  desktop — preset reverse / 21 plugin rows, layer 5/11, 4 unrelated skip(s)
-PASS  dsh-tui — preset reverse / 21 plugin rows, layer 3/3, 0 unrelated skip(s)
-PASS  headless — preset reverse / 21 plugin rows, layer 3/3, 0 unrelated skip(s)
-PASS  web — preset reverse / 21 plugin rows, layer 6/6, 0 unrelated skip(s)
+- **A session with conversation history cannot switch presets** — start a new session.
+- The mode mounts with the host, so every startup launches REA once (about 1.4 s warm, 3.7 s cold).
+  Run `npm run setup -- --warm` once to pre-warm the npx cache; the first launch can otherwise take a minute.
 
-RESULT PASS — 4 profile(s) compose
-```
+### Engine locations (optional)
 
-Profiles without the bundle report `SKIP` and do not fail the run. The package contains no
-machine-specific absolute paths: the skill directory resolves from the package location, and
-analysis-engine locations come from environment variables only.
+Nothing to configure: REA discovers engines itself. Use these when you have several versions or a
+non-default location.
 
-### Fallback: profile-patch form
+| Variable | Purpose |
+|---|---|
+| `HOPPER_LAUNCHER_PATH` | Hopper CLI launcher. On macOS the default location is used automatically when present. |
+| `GHIDRA_INSTALL_DIR` | Ghidra install directory. The version must match what REA expects (12.1.4 today). |
+| `JAVA_HOME` | JVM used by Ghidra; only needed when the `java` on PATH is too old. |
+| `REA_IDA_MCP_CONFIG` | IDA MCP config file — the switch for IDA 9.x. |
+| `REA_MCP_SPEC` | Override the REA version, e.g. `REA_MCP_SPEC=rea-agents@6.7.0`, without editing this package. |
 
-Only for hosts whose dsh does not read bundles from `dsh.profile.bundles`. Merge
-`tui/profile.patch.yml` into `<profile>/cordis.patch.yml` and point its `path` at this checkout;
-`tui/agent.cordis.yml` is generated from `cordis.patch.yml` by `npm run sync:tui` — do not edit it
-by hand (`npm run verify` fails on drift). Bundle **and** patch together produce two
-`preset-reverse` rows; keep exactly one.
-
----
-
-## Analysis engines
-
-REA probes engines itself; the preset only forwards explicit locations. **Unset variables are fine.**
-
-| Variable | Purpose | Notes |
-|---|---|---|
-| `HOPPER_LAUNCHER_PATH` | Hopper CLI entry point | on macOS the default `~/Applications/Hopper Disassembler.app/Contents/MacOS/hopper` is used only if the file exists |
-| `GHIDRA_INSTALL_DIR` | Ghidra install | must be a release REA recognises (the pinned rea-agents checks **12.1.4**) |
-| `JAVA_HOME` | JVM for Ghidra | only needed when the `java` on PATH is too old |
-| `REA_IDA_MCP_CONFIG` | IDA MCP config | the switch for IDA 9.x |
-| `REA_MCP_SPEC` | override the REA pin | e.g. `REA_MCP_SPEC=rea-agents@6.7.0` without editing this package |
-
-Variables are read from the dsh process environment — restart after changing them. Empty strings
-are filtered out, because REA treats an empty string as an explicit (broken) setting.
-
----
-
-## Usage
-
-1. Restart dsh, then `/preset` → Reverse Engineering Mode (or `/preset reverse`).
-2. A session that already has history cannot switch presets (tool calls in history must match the
-   live toolset). Switch in a fresh session, or `/new`.
-3. Confirm REA is up via `/mcp`, or ask the agent to list tools. Names look like `mcp__rea__*`.
-
-**Startup cost**: preset declarations mount eagerly, so every boot spawns REA once — about **1.4 s**
-warm (npx cache) and **3.7 s** cold. That is the design cost of this mode, not a failure.
-`failOnStartupError: false` keeps the mode selectable when REA cannot start (it just has no REA tools).
-
----
-
-## Verify
-
-```sh
-npm install      # js-yaml only
-npm run verify            # structure, portability, dsh-tui twin, live-host schemas
-npm run verify:profiles   # what each real profile on this machine composes
-```
-
-`verify` checks: the package declares a bundle patch; the patch is a pure insert layer; 21 top-level
-rows / 34 rows total with unique ids; every group carries an isolate realm; `--prefer-offline` is
-kept; exactly one positional reaches REA; every env value is a non-empty string; `bundledSkillDir`
-resolves from both an installed profile and the tui include and degrades to `undefined`; no
-machine-specific path appears in either YAML; the tui composition equals the patch composition;
-rows are cross-checked against the host's shipped `standard` preset; and `mcp-client` /
-`skill-filesystem` configs pass the live Schemastery schemas. Without a dsh install, host-only
-checks report `SKIP` and the structural checks still run.
-
----
+dsh reads these at startup, so **restart after changing them**. An empty string counts as unset and is dropped.
 
 ## Uninstall
 
 ```sh
 dsh plugin --profile <desktop|web|headless|dsh-tui> remove dsh-rea-reverse-preset
-npm run unlink:all                # for a linked local checkout
+npm run unlink:all        # when installed through local symlinks
 ```
 
-If you installed the fallback form, delete the `preset-reverse` block from the profile patch and
-restart.
+## Troubleshooting
 
----
+| Symptom | Check first |
+|---|---|
+| No reverse-engineering entry in the preset list | Installed into a different profile, or not restarted; a dsh version outside the supported range skips the whole bundle. |
+| Mode present, zero REA tools | Cold npx start timed out, an empty env value, a wrong engine path, or a proxy. |
+| Fewer tools than expected | That engine was not found (IDA, typically) — expected behaviour. |
+| Skills not mounted | The package was moved, or two copies are installed in one profile. |
+| Config changes ignored | dsh reads this at startup only; restart the process. |
 
-## Layout
+Step-by-step diagnosis: [docs/troubleshooting.md](docs/troubleshooting.md).
 
-```text
-cordis.patch.yml      single source of truth: preset declaration + composition body
-skills/reverse-workflow/   bundled skill (target of bundledSkillDir)
-tui/                        fallback form only (unused by default)
-tui/agent.cordis.yml        generated twin (entry list) consumed by cordis-plugin-include
-tui/profile.patch.yml       loader snippet for the patch form
-scripts/verify.mjs          offline checks: structure, portability, twin, host schemas
-scripts/check-profiles.mjs  per-profile end-to-end composition on this machine
-scripts/sync-tui.mjs        generate / check the twin
-scripts/install.mjs         link this checkout into profiles (--profile / --all / --uninstall)
-docs/architecture.md  load path, realms, !!js evaluation, portability rules
-docs/troubleshooting.md  silent failure modes and measured numbers
-```
+## Notes
 
----
-
-## Known limits
-
-- **Host gate**: `peerDependencies` says `@deepseek-ai/dsh >=0.2.0-rc.2 <0.3.0-0`. On dsh 0.3.x the
-  bundle is skipped (listed in `skippedBundles`) instead of breaking your composition; realign the
-  `standard` base as described in `docs/architecture.md`.
-- Preset declarations mount eagerly — there is no "pay only when selected".
-- REA cannot be shared globally: `mcp-client` tools belong to the preset scope.
-- On Windows `tool-pwsh` is active and `tool-bash` is disabled, mirroring the shipped `standard`.
-
----
+- The package declares exactly one preset (`id: reverse`) containing 21 top-level rows / 34 plugin rows,
+  packaged as a dsh **bundle**, so `dsh plugin add` is all it takes.
+- Host requirement: `@deepseek-ai/dsh >=0.2.0-rc.2 <0.3.0-0`. Outside that range the bundle is skipped with a
+  notice instead of breaking your composition.
+- How it loads, why it is built this way, the `!!js` evaluation environment and the compatibility gate:
+  [docs/architecture.md](docs/architecture.md).
 
 ## License
 
-MIT for this package. It calls [REA](https://github.com/morluto/rea) (MIT) without vendoring it.
-Ghidra, Hopper and IDA keep their own licenses; this package neither bundles nor redistributes them.
+MIT — see [LICENSE](LICENSE). This package calls [REA](https://github.com/morluto/rea) (MIT) without bundling
+its code. Ghidra, Hopper and IDA keep their own licenses; none is shipped or managed here.

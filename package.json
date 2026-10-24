@@ -1,7 +1,7 @@
 {
   "name": "dsh-rea-reverse-preset",
   "version": "1.0.0",
-  "description": "DeepSeek Harness bundle: a reverse-engineering agent preset that mounts the REA MCP server (~139 tools), a reverse-engineering persona, and an evidence-discipline skill.",
+  "description": "逆向工程模式 for DeepSeek Harness: one preset that mounts ~139 REA tools (Ghidra / Hopper / IDA), a reverse-engineer persona, and an evidence-first analysis workflow.",
   "keywords": [
     "dsh",
     "dsh-plugin",

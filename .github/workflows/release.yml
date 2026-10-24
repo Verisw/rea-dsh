@@ -1,0 +1,68 @@
+name: release
+
+# 发布到 npm。两种凭证路径，按仓库里有没有 NPM_TOKEN secret 自动切换：
+#
+#   1) 有 NPM_TOKEN  → 用它发布（首次发布只能走这条：npm 的 Trusted Publisher
+#      只能在包已经存在之后才能配置，新包没有可绑定的页面）
+#   2) 没有 NPM_TOKEN → 走 OIDC Trusted Publishing：GitHub 现场签发短期令牌，
+#      npm 校验「仓库 + workflow 文件名 + 触发方式」是否与包上登记的发布者一致，
+#      仓库里不存任何长期密钥。需要 npm >= 11.5.1。
+#
+# 触发：推 v* tag（推荐，tag 必须等于 package.json 的 version），或手动 dispatch。
+# provenance 会把「哪个 commit、哪个 workflow、哪次运行」写进包的元数据，
+# 所以 id-token: write 和 contents: read 都是必需的。
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: upgrade npm (OIDC trusted publishing needs >= 11.5.1)
+        run: npm install -g npm@latest && npm --version
+
+      - name: install dev deps
+        run: npm install --no-audit --no-fund
+
+      - name: verify the package before publishing
+        run: |
+          node scripts/verify.mjs
+          node scripts/sync-tui.mjs --check
+          node scripts/publish-check.mjs
+
+      - name: publish with NPM_TOKEN (first release)
+        if: env.NPM_TOKEN != ''
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: publish via OIDC trusted publishing (later releases)
+        if: env.NPM_TOKEN == ''
+        run: npm publish --provenance --access public
+
+      - name: confirm the registry actually has it
+        run: |
+          sleep 5
+          node scripts/publish-check.mjs --verify-registry
+
+      - name: release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --generate-notes --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}

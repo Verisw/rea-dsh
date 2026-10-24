@@ -48,7 +48,11 @@
     "link:headless": "node scripts/install.mjs --profile headless",
     "link:tui": "node scripts/install.mjs --profile dsh-tui",
     "link:all": "node scripts/install.mjs --all",
-    "unlink:all": "node scripts/install.mjs --all --uninstall"
+    "unlink:all": "node scripts/install.mjs --all --uninstall",
+    "publish:check": "node scripts/publish-check.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dsh": {
     "bundle": {

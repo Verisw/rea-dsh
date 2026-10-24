@@ -7,6 +7,17 @@
 
 首个公开版本。
 
+### 发布自动化
+
+- 新增 `.github/workflows/release.yml`：推 `v*` tag 时先跑 `verify` /
+  `sync-tui --check` / `publish-check`，再 `npm publish --provenance`，最后回查
+  registry 并自动建 Release。凭证两段走：首次发布用 `NPM_TOKEN` secret，
+  之后改为 OIDC Trusted Publishing，仓库里不留长期密钥。
+- 新增 `scripts/publish-check.mjs`（`npm run publish:check`）：tag 与
+  `package.json` 版本对齐、CHANGELOG 有对应小节、包名是否已被占、发布后
+  `--verify-registry` 回查。发错版本号在 npm 上是不可逆的，这一步放在 CI 里做。
+- `package.json` 增加 `publishConfig.access = public`。
+
 ### 发布形态
 
 - 仓库根目录**就是** npm 包：`package.json` 带 `dsh.bundle.patch`，

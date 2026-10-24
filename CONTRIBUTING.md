@@ -47,6 +47,36 @@ node scripts/setup.mjs --warm   # 改了 scripts/rea-lazy.mjs 之后：真跑一
 `tool-plugin-manager`、`tool-ralph` 转 disabled）。这类变化不报错，只会静默少功能，
 所以升级 PR 请附上 `npm run verify` 的完整输出。
 
+## 发版
+
+版本号走 tag，不走人肉记忆：
+
+```sh
+npm run publish:check              # tag / CHANGELOG / 包名是否已被占，本地先看一眼
+# 改 package.json 的 version，把 CHANGELOG 补上这一版的小节
+git commit -am "chore: release 1.0.1"
+git tag -a v1.0.1 -m "v1.0.1" && git push origin main v1.0.1
+```
+
+推 tag 会触发 `.github/workflows/release.yml`：先跑 `verify` / `sync-tui --check` /
+`publish-check`，再 `npm publish --provenance --access public`，最后回查 registry
+上确实有这一版，并用 `CHANGELOG` 的同一份号建 GitHub Release。
+
+凭证分两段：
+
+- **首次发布**（包名在 registry 上还不存在）只能带凭证发：在 npmjs.com 建一个
+  Granular Access Token（Read and write，可设 7 天过期），存成仓库 secret
+  `NPM_TOKEN`。原因是 npm 的 Trusted Publisher 只能挂在**已存在**的包上，
+  新包没有那个设置页可填。
+- **之后每一版**都不需要 secret：删掉 `NPM_TOKEN` 即可，workflow 自动改走 OIDC
+  Trusted Publishing（GitHub 现场签短期令牌，npm 校验仓库 + workflow 文件名 +
+  触发方式）。仓库里不存长期密钥。
+
+首次发布完成后，去 npmjs.com 该包的 Settings → Trusted Publisher 填：
+owner `Verisw`、repository `rea-dsh`、workflow `release.yml`、environment 留空。
+`--provenance` 会把 commit、workflow、运行记录写进包元数据，所以
+`id-token: write` 这个权限不能删。
+
 ## 提交信息
 
 用祈使句，一行说清改了什么，例如：

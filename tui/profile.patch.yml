@@ -1,0 +1,20 @@
+# dsh-tui 装载片段：并进 ~/.dsh/profiles/dsh-tui/cordis.patch.yml
+#
+# 只改一处：把 include 的 path 换成本机这份仓库的绝对路径
+# （file:// + tui/agent.cordis.yml）。其余照抄。
+#
+# 合并后重启 TUI；/preset 里出现「逆向工程模式」即生效。
+
+- insert:
+    - id: preset-reverse
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: reverse
+        name: 逆向工程模式
+        description: 面向已发布软件的逆向模式：REA 的 MCP 工具（Ghidra / Hopper / IDA / 二进制与 Electron 制品）+ 逆向分析师人设 + 逆向工作流技能。
+        order: 5
+        plugins:
+          - id: reverse-composition
+            name: '@deepseek-ai/cordis-plugin-include'
+            config:
+              path: 'file:///REPLACE_WITH_ABSOLUTE_PATH/rea-dsh/tui/agent.cordis.yml'

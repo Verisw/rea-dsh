@@ -1,0 +1,73 @@
+{
+  "name": "dsh-rea-reverse-preset",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness bundle: a reverse-engineering agent preset that mounts the REA MCP server (~139 tools), a reverse-engineering persona, and an evidence-discipline skill.",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "dsh-bundle",
+    "deepseek-harness",
+    "agent-preset",
+    "reverse-engineering",
+    "rea",
+    "mcp",
+    "ghidra",
+    "hopper",
+    "ida"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "icon": "./icon.png",
+  "files": [
+    "cordis.patch.yml",
+    "skills",
+    "tui",
+    "docs",
+    "scripts",
+    "icon.png",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "verify": "node scripts/verify.mjs",
+    "sync:tui": "node scripts/sync-tui.mjs",
+    "sync:tui:check": "node scripts/sync-tui.mjs --check",
+    "link:desktop": "node scripts/install-desktop.mjs",
+    "unlink:desktop": "node scripts/install-desktop.mjs --uninstall"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2 <0.3.0-0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=20.16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Verisw/rea-dsh.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Verisw/rea-dsh/issues"
+  },
+  "homepage": "https://github.com/Verisw/rea-dsh#readme"
+}

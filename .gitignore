@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# dependencies
+node_modules/
+pnpm-lock.yaml
+
+# local edits / backups
+*.bak
+*.bak-*
+*.orig
+
+# verification scratch
+.verify/

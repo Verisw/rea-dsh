@@ -1,0 +1,50 @@
+name: Bug report
+description: 组合没生效、工具没起来、技能缺失
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        这个包的失败模式大多是静默的。请先看 docs/troubleshooting.md
+        （按症状分节，含实测数据）。附上 `npm run verify` 的完整输出能省掉大半来回。
+  - type: input
+    id: dsh-version
+    attributes:
+      label: dsh 版本
+      description: `dsh --version` 的输出
+    validations:
+      required: true
+  - type: dropdown
+    id: landing
+    attributes:
+      label: 落地形态
+      options:
+        - 桌面 / Web（bundle patch）
+        - dsh-tui（profile patch + include）
+    validations:
+      required: true
+  - type: textarea
+    id: symptom
+    attributes:
+      label: 症状
+      description: 模式没出现 / REA 工具为 0 / 技能缺失 / 切 preset 被拒 ……
+    validations:
+      required: true
+  - type: textarea
+    id: verify
+    attributes:
+      label: npm run verify 输出
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: engines
+    attributes:
+      label: 引擎相关环境变量
+      description: 只需要值的**是否设置**，不要贴私有路径
+      render: text
+      placeholder: |
+        HOPPER_LAUNCHER_PATH=set
+        GHIDRA_INSTALL_DIR=unset
+        JAVA_HOME=set
+        REA_IDA_MCP_CONFIG=unset

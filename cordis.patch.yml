@@ -1,0 +1,282 @@
+# dsh-rea-reverse-preset — the bundle patch layer.
+#
+# ONE job: insert a single `@deepseek-ai/dsh-agent-preset` declaration, so the
+# harness grows a selectable "reverse-engineering" mode. It layers after
+# `@deepseek-ai/dsh-web-app`, which already declares the preset registry and the
+# shipped standard / ptc / minimal / cordis presets, so this file adds one more
+# and overrides nothing.
+#
+# WHAT A PRESET IS (and is not). A preset is not a plugin: it owns no entry
+# module, exports nothing, and never runs code of its own. It is a declaration
+# whose `plugins` list is mounted under a private registry scope, and the rows
+# inside that list are the actual plugins. Read docs/architecture.md before
+# editing; it explains the mount timing, the realm rules, and why the two rows
+# below deviate from a bare copy of `standard`.
+#
+# A patch layer does not deep-merge: every row restates the full `config` it
+# owns. The child rows mirror the shipped `standard` preset
+# (`dsh-web-app/presets/standard.patch.yml`) so this mode is the standard coding
+# mode plus the reverse-engineering surface.
+#
+# PORTABILITY. Nothing here may name a path from one machine. Every
+# machine-specific engine location is read from the environment and omitted when
+# unset, and every path inside the package resolves itself at run time. The
+# `!!js` expressions are the only place that logic lives; `npm run verify`
+# rejects an absolute /Users or /home path anywhere in this file.
+#
+# THE YAML DIALECT. `!!js` scalars are JavaScript expressions evaluated by the
+# loader with the entry context in scope (`process`, `ctx`, and the globals are
+# reachable). Use a folded block scalar (`>-`) for anything longer than a short
+# expression: it keeps the file readable and sidesteps the reserved-indicator
+# rule that makes a line starting with a backtick unparsable in a plain scalar.
+#
+# Two rows deviate from a bare copy of `standard`, deliberately:
+#   * `tool-presentation` is pinned to `native`. REA publishes ~139 tools; in
+#     `ptc` presentation they collapse into a code-call surface the model must
+#     learn before it can reach them. Several deployments default to `ptc`, so
+#     the pin is stated rather than inherited.
+#   * `mcp-rea` carries `failOnStartupError: false`. A cold npx cache or an
+#     offline machine then leaves the mode without REA tools and a loud log line,
+#     instead of failing the whole preset so no reverse session can start.
+#     docs/troubleshooting.md lists the symptoms and the two-minute diagnosis.
+
+- insert:
+    - id: preset-reverse
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: reverse
+        name: 逆向工程模式
+        description: 面向已发布软件（原生二进制 / Electron / 托管程序集 / 移动与固件制品 / 运行中进程）的逆向模式：挂载 REA MCP 工具与逆向工作流技能，产出带证据落点、可重建的结论。
+        order: 5
+        plugins:
+          # ── the REA MCP server ────────────────────────────────────────────
+          # Tools reach the model as `mcp__rea__<name>`. The row lives inside
+          # the preset, so the server is mounted with this mode's standing
+          # composition and its tools exist for agents on this mode only.
+          - id: mcp-rea
+            name: '@deepseek-ai/dsh-mcp-client'
+            config:
+              serverName: rea
+              transport: stdio
+              command: npx
+              # `--prefer-offline` is load-bearing. Measured: with a warm npx
+              # cache and an unreachable registry a bare `npx -y` took ~71 s,
+              # past the MCP SDK's 60 s request timeout, which silently drops
+              # every REA tool. With the flag the same case settles in ~1.4 s,
+              # and a cold machine can still install from the network.
+              #
+              # `mcp` must be the ONLY argument REA's bin receives; any further
+              # flag makes it fall through to its CLI branch.
+              #
+              # REA_MCP_SPEC overrides the pin without editing this file.
+              args: !!js >-
+                ['--prefer-offline', '-y', process.env.REA_MCP_SPEC || 'rea-agents@6.3.0', 'mcp']
+              # Every engine location is opt-in from the environment. An unset
+              # key is omitted rather than passed empty: REA treats
+              # `HOPPER_LAUNCHER_PATH=''` as a configuration error and then stops
+              # answering requests (measured: 40 s+ hang), while a missing key
+              # falls back to its own probe in ~1.8 s.
+              #
+              # GHIDRA_INSTALL_DIR must point at an extracted release whose
+              # application.properties reports the version rea-agents verifies
+              # (12.1.4 for the pinned build). JAVA_HOME is only needed when the
+              # JVM on PATH is older than the one Ghidra requires.
+              env: !!js >-
+                (() => { const { existsSync } = process.getBuiltinModule('node:fs'); const hopperDefault = process.platform === 'darwin' && process.env.HOME ? process.env.HOME + '/Applications/Hopper Disassembler.app/Contents/MacOS/hopper' : undefined; return Object.fromEntries(Object.entries({ HOPPER_LAUNCHER_PATH: process.env.HOPPER_LAUNCHER_PATH || (hopperDefault && existsSync(hopperDefault) ? hopperDefault : undefined), GHIDRA_INSTALL_DIR: process.env.GHIDRA_INSTALL_DIR, JAVA_HOME: process.env.JAVA_HOME, REA_IDA_MCP_CONFIG: process.env.REA_IDA_MCP_CONFIG }).filter(([, value]) => typeof value === 'string' && value !== '')); })()
+              # REA's own timeout is per analysis call; this one bounds a single
+              # MCP request so a stuck provider cannot hold the turn open.
+              toolCallTimeoutMs: 600000
+              failOnStartupError: false
+
+          # ── identity ──────────────────────────────────────────────────────
+          # The prefix replaces the deployment's coding-agent line for this
+          # mode. `{{model}}` resolves from the agent's own route.
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |
+                You are a reverse-engineering analyst powered by the {{model}} model. You recover how shipped software works from its artifacts and runtime behavior, and you explain it well enough that someone else can rebuild it.
+                Use this mode when the target is a compiled or packaged artifact, a runtime process, or a question that cannot be answered from available source code. When a complete source repository answers the question, say so and analyze the source normally instead of reaching for disassembly or decompilation.
+                Before analyzing, confirm the user owns the target or has stated authorization to analyze it. Ask once if that is unclear; do not ask again after the user confirms.
+                Route by artifact: a native binary or analysis database is native disassembly work; an asar, packed JavaScript bundle, or Electron tree is JavaScript analysis; a managed assembly is managed analysis; an archive, installer, APK, IPA, MSIX, or firmware image is artifact analysis first; a page or Electron process the user already has open is runtime observation.
+                Ground every claim in tool evidence with a landing point — a function name, an address, a file offset, a string, a call relationship, or a raw tool result. Mark each statement as verified (from tool output), inferred (with the reasoning chain shown), or unknown (and name the evidence that would settle it). Never present a decompiler's reconstruction as source fact.
+                Copy a target file before any operation that could modify it, and say where the copy is.
+                REA's annotation tools change the analysis session database, not the analyzed bytes, but some REA tools also write files and can alter the persistent state of a running application; treat every tool whose description reports side effects as a state change and say what it touched.
+                When an REA tool call fails or reports a provider as unavailable, name the missing analysis engine in your answer and continue with the evidence planes that still work instead of retrying the same call. If no REA tool is available at all, say so explicitly and fall back to the shell, file, and search tools — do not imply that REA evidence exists when it does not.
+                Deliver findings, not raw tool output: keep the conclusion in the answer, write bulky dumps to the working directory, and read back only the slices you need. Split broad investigations across subagents by evidence plane and merge their results.
+
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+
+          # ── repository and shell tools ────────────────────────────────────
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+
+          # ── skills ────────────────────────────────────────────────────────
+          # This bundle ships one skill (`reverse-workflow`). REA's own
+          # `reverse-engineer-anything` skill needs no row: `~/.agents/skills` is
+          # the provider's `user-agents` root and is scanned by default, so
+          # naming it again would only log a duplicate-discovery notice.
+          #
+          # `bundledSkillDir` must be absolute — a relative value in `config` is
+          # never resolved by anything, and the process working directory would
+          # silently decide whether the skill is found. It therefore locates
+          # itself: first as an installed package next to the profile, then as
+          # `../skills` beside this composition file (the dsh-tui shape). When
+          # every candidate misses, the key is dropped and the mode simply runs
+          # with one skill fewer; docs/troubleshooting.md says how to tell.
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+            config:
+              bundledSkillDir: !!js >-
+                (() => { const { createRequire } = process.getBuiltinModule('node:module'); const { dirname, join } = process.getBuiltinModule('node:path'); const { existsSync } = process.getBuiltinModule('node:fs'); const { fileURLToPath } = process.getBuiltinModule('node:url'); const candidates = []; for (const anchor of [ctx.baseUrl, process.cwd() + '/']) { if (!anchor) continue; try { candidates.push(join(dirname(createRequire(anchor).resolve('dsh-rea-reverse-preset/package.json')), 'skills')); } catch {} } if (ctx.baseUrl) { try { candidates.push(fileURLToPath(new URL('../skills/', ctx.baseUrl))); } catch {} } return candidates.find((candidate) => existsSync(candidate)); })()
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+
+          # ── goals and planning ────────────────────────────────────────────
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+          - id: planning
+            name: cordis:group
+            group: true
+            isolate:
+              planMode: true
+            config:
+              - id: plan-mode
+                name: '@deepseek-ai/dsh-plan-mode'
+                config:
+                  section: |
+                    You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+
+                    Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
+
+                    The tool catalog stays the same across modes for request-cache stability. These plan-mode rules override any later tool description or guidance that suggests using mutation tools; those tools remain listed to keep the tool catalog unchanged. Do not use todo_write to track this planning phase: it tracks implementation after an approved plan, while the plan itself belongs in exit_plan_mode.
+
+                    Resolve discoverable facts by inspection. Use ask_user_question only for user-owned choices or material ambiguity that inspection cannot answer. Do not ask the user where code lives or how current behavior works when you can find out.
+
+                    Make the plan decision-complete: state the goal and success criteria; group implementation changes by subsystem; identify public API, schema, and data-flow changes; cover edge cases, failure modes, tests, acceptance criteria, and explicit assumptions. Keep it concise enough to review but detailed enough that another engineer can implement it without making design decisions.
+
+                    When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response: it presents the plan for approval, and implementation begins only in a later step after approval. Do not paste the final plan as a plain reply or ask "should I proceed?" through prose or ask_user_question. If review rejects it, incorporate the feedback and present again. If the review channel is unavailable or aborted, stay in plan mode and ask the user to switch modes manually; do not proceed with implementation.
+
+          # ── context management ────────────────────────────────────────────
+          # `compaction-basic` reads `toolResultPrune` through `ctx.get`, so the
+          # pruner shares this realm instead of sitting outside it. `tokenMeter`
+          # is deliberately NOT isolated: the meter stays on the host plane and
+          # every row here resolves that one instance.
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+
+          # ── delegation ────────────────────────────────────────────────────
+          # The `subagents` registry and its spawn/fork backends live on the host
+          # plane: a provider name may only be registered once, and the browser
+          # queries the registry across sessions. This preset contributes the
+          # TOOLS, which resolve that host registry. `workflows` is the opposite
+          # — nothing outside an agent reads it — so every row reaching it shares
+          # one entry-local realm here.
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent-list-agents
+                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelectionSettings: true
+                  backgroundMode: continuable
+              - id: tool-subagent-fork
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: fork
+                  toolName: subagent_fork
+                  backgroundMode: continuable
+              # Optional providers. Install the matching bundle in this profile
+              # and remove `disabled` — host availability alone grants no tool.
+              - id: tool-subagent-codex
+                name: '@deepseek-ai/dsh-tool-subagent'
+                disabled: true
+                config:
+                  provider: codex
+                  toolName: subagent_codex
+                  backgroundMode: one-shot
+                  maxDepth: provider-managed
+              - id: tool-subagent-claude-code
+                name: '@deepseek-ai/dsh-tool-subagent'
+                disabled: true
+                config:
+                  provider: claude-code
+                  toolName: subagent_claude_code
+                  backgroundMode: one-shot
+                  maxDepth: provider-managed
+              - id: workflow-ptc
+                name: '@deepseek-ai/dsh-workflow-ptc'
+                config:
+                  provider: spawn
+              - id: tool-workflow
+                name: '@deepseek-ai/dsh-tool-workflow'
+              # Disabled exactly as the shipped standard leaves it.
+              - id: tool-ralph
+                name: '@deepseek-ai/dsh-tool-ralph'
+                disabled: true
+                config:
+                  subagentProvider: spawn
+                  maxRounds: 64
+
+          # ── interaction ───────────────────────────────────────────────────
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          - id: tool-plugin-manager
+            name: '@deepseek-ai/dsh-plugin-manager/tools'
+            disabled: true
+          - id: tool-presentation
+            name: '@deepseek-ai/dsh-agent-tool-presentation'
+            config:
+              mode: native

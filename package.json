@@ -16,6 +16,9 @@
     "ida"
   ],
   "type": "module",
+  "bin": {
+    "dsh-rea-setup": "scripts/setup.mjs"
+  },
   "license": "MIT",
   "icon": "./icon.png",
   "files": [
@@ -33,6 +36,8 @@
     "LICENSE"
   ],
   "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "setup:check": "node scripts/setup.mjs --check",
     "verify": "node scripts/verify.mjs",
     "verify:profiles": "node scripts/check-profiles.mjs",
     "sync:tui": "node scripts/sync-tui.mjs",

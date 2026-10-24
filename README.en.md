@@ -27,6 +27,36 @@ of plugins, mounted as its own scope by the registry. The rows inside that scope
 
 ## Install
 
+### One command (recommended)
+
+```sh
+npm run setup                         # from a checkout
+npx -y dsh-rea-reverse-preset setup   # from the published package
+```
+
+It runs five steps without asking anything:
+
+1. environment check — node, dsh version, which profiles exist here;
+2. install — symlink the checkout into every profile, or call `dsh plugin --profile <p> add`
+   when running from an installed package;
+3. probe analysis engines — Hopper / Ghidra / Java 21 / IDA — and print the `export` lines it
+   would use;
+4. verify — `verify` plus the real per-profile composition;
+5. finish — say exactly which surface to restart, and in what order to confirm.
+
+| Flag | Effect |
+|---|---|
+| (none) | install into every profile and verify |
+| `--check` | report only, touch nothing |
+| `--write-env` | write the probed engine paths into `~/.zshrc` (marked block, idempotent) |
+| `--warm` | pre-warm the REA npx cache (a minute or two cold, ~1.4 s warm) |
+| `--uninstall` | remove from every profile |
+| `--dry-run` | print what would happen |
+
+Use `npm run setup -- --check` — arguments after `--` belong to the script.
+
+### Manual
+
 One mechanism — a **bundle** — for all four profiles. Install once, restart that surface.
 
 | You use | profile | Install | Takes effect |

@@ -15,6 +15,7 @@
 
 ```sh
 npm install          # js-yaml
+npm run setup        # 一键：装进本机所有 profile 并校验（= 下面三条的组合）
 npm run sync:tui     # 改完 patch 之后
 npm run verify       # 必须 PASS（离线、与机器无关）
 npm run verify:profiles   # 本机装了 dsh 的话：四个 profile 的真实装载结果

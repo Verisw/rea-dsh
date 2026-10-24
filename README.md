@@ -24,6 +24,50 @@
 
 ## 安装
 
+### 一键（推荐）
+
+```sh
+npm run setup                         # 在 checkout 里
+npx -y dsh-rea-reverse-preset setup   # 发布后，从 npm 包直接跑
+```
+
+它会自己走完五步，中途不需要回答任何问题：
+
+1. 环境自检：node 版本、dsh 版本、本机有哪几个 profile；
+2. 装：checkout 里就软链进全部 profile；从 npm 包里跑就调 `dsh plugin --profile <p> add`；
+3. 探分析引擎：Hopper / Ghidra / Java 21 / IDA，把探到的路径列成 `export` 建议；
+4. 校验：`verify` + 每个 profile 的真实装载结果；
+5. 收尾：明确告诉你**哪个界面要重启**、重启后按什么顺序确认。
+
+```text
+== 运行环境 ==
+  ok   node 23.11.0
+  ok   dsh 0.2.0-rc.2  (/opt/homebrew/lib/node_modules/@deepseek-ai/dsh/package.json)
+  ok   来源：git checkout /Users/.../rea-dsh -> 软链安装，改代码即时生效
+== profile ==
+  ok   desktop  已装
+  ok   dsh-tui  已装
+  ok   headless 已装
+  ok   web      已装
+== 分析引擎 ==   == 校验 ==   == 接下来 ==
+  完成，没有需要你处理的问题。
+```
+
+| 参数 | 作用 |
+|---|---|
+| （无） | 装进全部 profile 并校验 |
+| `--check` | 只看状态，一个文件都不动 |
+| `--write-env` | 把探到的引擎路径写进 `~/.zshrc`（标记块，可重复执行） |
+| `--warm` | 预热 REA 的 npx 缓存（首次一两分钟，之后约 1.4 s） |
+| `--uninstall` | 从全部 profile 卸掉 |
+| `--dry-run` | 只打印将要执行的事 |
+
+```sh
+npm run setup -- --check --write-env   # -- 之后的参数才传给脚本
+```
+
+### 手动（想分步确认时）
+
 四个 profile 一套机制：**bundle**。装一次，重启对应界面即可。
 
 | 你在用 | profile | 装法 | 生效方式 |

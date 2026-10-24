@@ -28,6 +28,11 @@
 
 ### 新增
 
+- `npm run setup`（`scripts/setup.mjs`，也注册为 `dsh-rea-setup` bin）：一键流程——
+  环境自检 → 装进全部 profile → 探分析引擎（Hopper / Ghidra / Java 21 / IDA）→
+  `verify` + 每个 profile 的真实装载校验 → 打印重启指引。参数：`--check` / `--write-env` /
+  `--warm` / `--uninstall` / `--dry-run`。在 checkout 里软链安装，从 npm 包里跑则走
+  `dsh plugin --profile <p> add`。
 - `npm run verify`：结构、可移植性、tui 同构、宿主 `standard` 基座与实时 Schemastery 校验。
 - `npm run sync:tui` / `sync:tui:check`：生成并守护 tui 侧组合。
 - `npm run link:desktop|link:web|link:headless|link:tui|link:all` 与 `unlink:all`：

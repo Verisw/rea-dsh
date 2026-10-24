@@ -10,17 +10,21 @@
 ## 改动的唯一入口
 
 `cordis.patch.yml` 是唯一真相。`tui/agent.cordis.yml` 是 `npm run sync:tui` 生成的投影——
-**不要手改**，改了会在下次生成时被覆盖，`npm run verify` 也会报漂移。
+**不要手改**，改了会在下次生成时被覆盖，`npm run verify` 也会报漂移。`tui/` 整体只是回退形态，
+改动不要往那边加东西。
 
 ```sh
 npm install          # js-yaml
 npm run sync:tui     # 改完 patch 之后
-npm run verify       # 必须 PASS
+npm run verify       # 必须 PASS（离线、与机器无关）
+npm run verify:profiles   # 本机装了 dsh 的话：四个 profile 的真实装载结果
 ```
 
 ## 提交前自查
 
 - [ ] `npm run verify` 全绿（没装 dsh 的机器上，宿主相关项应为 `SKIP` 而不是 FAIL）。
+- [ ] 装过本包的 profile 上 `npm run verify:profiles` 全绿（这条查的是宿主真的装载出了
+      `preset-reverse`，离线 `verify` 覆盖不到）。
 - [ ] 没有引入机器相关绝对路径（`/Users/...`、`/home/<user>/...`、`C:\Users\...`）。
 - [ ] 新增 `!!js` 表达式只写纯量；需要多行就用 `>-` 折叠块，别用以反引号开头的模板字符串。
 - [ ] `mcp-client` 的 `env` 值都是非空字符串（`undefined` 会让整个 config 校验抛错，

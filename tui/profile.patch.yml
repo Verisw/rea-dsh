@@ -1,9 +1,12 @@
-# dsh-tui 装载片段：并进 ~/.dsh/profiles/dsh-tui/cordis.patch.yml
+# 回退方案：只在宿主不读 profile bundle 时才用。
 #
-# 只改一处：把 include 的 path 换成本机这份仓库的绝对路径
-# （file:// + tui/agent.cordis.yml）。其余照抄。
+# 1.0.0 起 bundle 本身就能覆盖 desktop / web / headless / dsh-tui 四个 profile
+# （npm run link:all 一次装齐），根本不需要这个文件。仅当你的 dsh-tui 版本
+# 不从 dsh.profile.bundles 里取 bundle 时，才把下面这段并进
+# ~/.dsh/profiles/dsh-tui/cordis.patch.yml，并改一处：把 include 的 path 换成
+# 本机这份仓库的绝对路径（file:// + tui/agent.cordis.yml）。
 #
-# 合并后重启 TUI；/preset 里出现「逆向工程模式」即生效。
+# 注意：bundle 与这段同时生效会得到两条 preset-reverse 行，只留一个。
 
 - insert:
     - id: preset-reverse
@@ -11,7 +14,7 @@
       config:
         id: reverse
         name: 逆向工程模式
-        description: 面向已发布软件的逆向模式：REA 的 MCP 工具（Ghidra / Hopper / IDA / 二进制与 Electron 制品）+ 逆向分析师人设 + 逆向工作流技能。
+        description: 面向已发布软件（原生二进制 / Electron / 托管程序集 / 移动与固件制品 / 运行中进程）的逆向模式：挂载 REA MCP 工具与逆向工作流技能，产出带证据落点、可重建的结论。
         order: 5
         plugins:
           - id: reverse-composition

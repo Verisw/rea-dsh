@@ -34,10 +34,15 @@
   ],
   "scripts": {
     "verify": "node scripts/verify.mjs",
+    "verify:profiles": "node scripts/check-profiles.mjs",
     "sync:tui": "node scripts/sync-tui.mjs",
     "sync:tui:check": "node scripts/sync-tui.mjs --check",
-    "link:desktop": "node scripts/install-desktop.mjs",
-    "unlink:desktop": "node scripts/install-desktop.mjs --uninstall"
+    "link:desktop": "node scripts/install.mjs --profile desktop",
+    "link:web": "node scripts/install.mjs --profile web",
+    "link:headless": "node scripts/install.mjs --profile headless",
+    "link:tui": "node scripts/install.mjs --profile dsh-tui",
+    "link:all": "node scripts/install.mjs --all",
+    "unlink:all": "node scripts/install.mjs --all --uninstall"
   },
   "dsh": {
     "bundle": {

@@ -30,13 +30,20 @@
 
 - `npm run verify`：结构、可移植性、tui 同构、宿主 `standard` 基座与实时 Schemastery 校验。
 - `npm run sync:tui` / `sync:tui:check`：生成并守护 tui 侧组合。
-- `npm run link:desktop` / `unlink:desktop`：本地软链进 desktop profile（幂等）。
+- `npm run link:desktop|link:web|link:headless|link:tui|link:all` 与 `unlink:all`：
+  本地软链进 profile（幂等）。`scripts/install.mjs` 支持 `--profile` 重复传、`--all`、`--uninstall`。
+- `npm run verify:profiles`（`scripts/check-profiles.mjs`）：从宿主加载
+  `@deepseek-ai/dsh-app-boot`，对每个已装本包的 profile 调 `loadProfileDirectory`，
+  断言 `preset-reverse` 行真的进了组合——这是离线 `verify` 查不到的那一层。
 - 文档：`docs/architecture.md`（装载链路、realm、`!!js` 求值、兼容性门槛）、
   `docs/troubleshooting.md`（静默失败路径与实测数据）、`README.en.md`。
 - 包图标 `icon.png`。
 
 ### 变更
 
+- **一套机制覆盖四个 profile**：`desktop`（桌面 App / 本机 Web GUI）、`web`（`dsh web`）、
+  `headless`（`dsh -p`）、`dsh-tui` 都直接读 `dsh.profile.bundles`，不再需要 TUI 专用的
+  profile patch。`tui/` 与 `sync:tui` 降级为「宿主不读 bundle 时」的回退形态。
 - preset 声明与 34 个插件行的组合保持不变：相对宿主 `standard` 仍是
   + `mcp-rea`、+ `tool-presentation`，改 `persona` 与 `skill-filesystem`。
 - `package.json` 声明 `peerDependencies`：`@deepseek-ai/dsh >=0.2.0-rc.2 <0.3.0-0`

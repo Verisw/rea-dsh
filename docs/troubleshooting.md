@@ -18,15 +18,22 @@
 
 ## 1. 模式没出现
 
+先确认你在看哪个 profile——桌面 App 用 `desktop`，`dsh web` 用 `web`，`dsh -p` 用
+`headless`，TUI 用 `dsh-tui`。它们各自的 `node_modules` 与 `package.json` 是分开的，
+装到 `web` 不会让桌面 App 出现这个模式。
+
 ```sh
-node -e "console.log(require(process.env.HOME+'/.dsh/profiles/desktop/package.json').dsh.profile.bundles)"
+node scripts/install.mjs          # 列出每个 profile 装没装
+npm run verify:profiles           # 直接看宿主装载出的组合（最快）
+node -e "console.log(require(process.env.HOME+'/.dsh/profiles/web/package.json').dsh.profile.bundles)"
 node -e "console.log(require.resolve('dsh-rea-reverse-preset/package.json'))"
 ```
 
-- `dsh.profile.bundles` 里没有它 → `dsh plugin --profile desktop add github:Verisw/rea-dsh`，
-  或本地开发用 `npm run link:desktop`。
+- `dsh.profile.bundles` 里没有它 → `dsh plugin --profile <name> add github:Verisw/rea-dsh`，
+  或本地开发用 `npm run link:all`。
 - 有但 `require.resolve` 失败 → `node_modules` 里是断链（clone 目录被移动/删除过）。
 - 都在，但启动 stderr 里出现 `skippedBundles` 且带本包名 → 宿主版本超出 peer 范围（§8）。
+- `verify:profiles` 报两条 `preset-reverse` → bundle 与 profile patch 同时在插（回退形态没删）。
 
 ## 2. REA 一个工具都没起来
 

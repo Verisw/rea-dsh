@@ -27,23 +27,63 @@ of plugins, mounted as its own scope by the registry. The rows inside that scope
 
 ## Install
 
-### Desktop / Web
+One mechanism — a **bundle** — for all four profiles. Install once, restart that surface.
+
+| You use | profile | Install | Takes effect |
+|---|---|---|---|
+| Desktop app (Electron) | `desktop` | `dsh plugin --profile desktop add github:Verisw/rea-dsh` | quit and reopen the app |
+| `dsh web` (browser UI) | `web` | `dsh plugin --profile web add github:Verisw/rea-dsh` | restart `dsh web` |
+| `dsh -p` (headless) | `headless` | `dsh plugin --profile headless add github:Verisw/rea-dsh` | next run |
+| dsh-tui | `dsh-tui` | `dsh plugin --profile dsh-tui add github:Verisw/rea-dsh` | restart the TUI |
+
+Desktop and web share the preset picker that `@deepseek-ai/dsh-web-app` inserts; each install just
+adds one row to that profile's registry. They are separate profiles (own `package.json`, own
+`node_modules`), so installing into one does not touch the other.
+
+See what this machine has:
 
 ```sh
-dsh plugin --profile desktop add github:Verisw/rea-dsh
-# local development:
-npm run link:desktop
+node scripts/install.mjs        # list only, changes nothing
 ```
 
-Restart dsh. The patch inserts the preset declaration at boot, and the selector gains the new mode.
-The package contains no machine-specific absolute paths: the skill directory resolves from the
-package location, and analysis-engine locations come from environment variables only.
+For local development, link the checkout straight into the profile (idempotent):
 
-### dsh-tui
+```sh
+npm run link:all        # desktop + web + headless + dsh-tui
+npm run link:web        # just one
+npm run unlink:all      # remove from all
+```
 
-Merge `tui/profile.patch.yml` into `~/.dsh/profiles/dsh-tui/cordis.patch.yml` and point its
-`path` at this checkout. `tui/agent.cordis.yml` is generated from `cordis.patch.yml` by
-`npm run sync:tui` — do not edit it by hand (`npm run verify` fails on drift).
+`dsh plugin --profile <name>` initialises non-desktop profiles from their template; the desktop
+profile must be created by the app first, and the app must be fully quit while you install.
+
+After restarting, ask the host itself what it composed:
+
+```sh
+npm run verify:profiles
+```
+
+```text
+host 0.2.0-rc.2 (/opt/homebrew/lib/node_modules/@deepseek-ai/dsh/package.json)
+PASS  desktop — preset reverse / 21 plugin rows, layer 5/11, 4 unrelated skip(s)
+PASS  dsh-tui — preset reverse / 21 plugin rows, layer 3/3, 0 unrelated skip(s)
+PASS  headless — preset reverse / 21 plugin rows, layer 3/3, 0 unrelated skip(s)
+PASS  web — preset reverse / 21 plugin rows, layer 6/6, 0 unrelated skip(s)
+
+RESULT PASS — 4 profile(s) compose
+```
+
+Profiles without the bundle report `SKIP` and do not fail the run. The package contains no
+machine-specific absolute paths: the skill directory resolves from the package location, and
+analysis-engine locations come from environment variables only.
+
+### Fallback: profile-patch form
+
+Only for hosts whose dsh does not read bundles from `dsh.profile.bundles`. Merge
+`tui/profile.patch.yml` into `<profile>/cordis.patch.yml` and point its `path` at this checkout;
+`tui/agent.cordis.yml` is generated from `cordis.patch.yml` by `npm run sync:tui` — do not edit it
+by hand (`npm run verify` fails on drift). Bundle **and** patch together produce two
+`preset-reverse` rows; keep exactly one.
 
 ---
 
@@ -81,7 +121,8 @@ warm (npx cache) and **3.7 s** cold. That is the design cost of this mode, not a
 
 ```sh
 npm install      # js-yaml only
-npm run verify   # structure, portability, dsh-tui twin, live-host schemas
+npm run verify            # structure, portability, dsh-tui twin, live-host schemas
+npm run verify:profiles   # what each real profile on this machine composes
 ```
 
 `verify` checks: the package declares a bundle patch; the patch is a pure insert layer; 21 top-level
@@ -98,11 +139,12 @@ checks report `SKIP` and the structural checks still run.
 ## Uninstall
 
 ```sh
-dsh plugin --profile desktop remove dsh-rea-reverse-preset
-npm run unlink:desktop            # for a linked local checkout
+dsh plugin --profile <desktop|web|headless|dsh-tui> remove dsh-rea-reverse-preset
+npm run unlink:all                # for a linked local checkout
 ```
 
-For dsh-tui, delete the `preset-reverse` block from the profile patch and restart.
+If you installed the fallback form, delete the `preset-reverse` block from the profile patch and
+restart.
 
 ---
 
@@ -111,11 +153,13 @@ For dsh-tui, delete the `preset-reverse` block from the profile patch and restar
 ```text
 cordis.patch.yml      single source of truth: preset declaration + composition body
 skills/reverse-workflow/   bundled skill (target of bundledSkillDir)
-tui/agent.cordis.yml  generated twin (entry list) consumed by cordis-plugin-include
-tui/profile.patch.yml loader snippet for dsh-tui
-scripts/verify.mjs    all checks
-scripts/sync-tui.mjs  generate / check the twin
-scripts/install-desktop.mjs  link this checkout into the desktop profile
+tui/                        fallback form only (unused by default)
+tui/agent.cordis.yml        generated twin (entry list) consumed by cordis-plugin-include
+tui/profile.patch.yml       loader snippet for the patch form
+scripts/verify.mjs          offline checks: structure, portability, twin, host schemas
+scripts/check-profiles.mjs  per-profile end-to-end composition on this machine
+scripts/sync-tui.mjs        generate / check the twin
+scripts/install.mjs         link this checkout into profiles (--profile / --all / --uninstall)
 docs/architecture.md  load path, realms, !!js evaluation, portability rules
 docs/troubleshooting.md  silent failure modes and measured numbers
 ```

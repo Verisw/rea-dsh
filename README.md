@@ -24,40 +24,69 @@
 
 ## 安装
 
-### A. 桌面版 / Web 版（bundle 形态，推荐）
+四个 profile 一套机制：**bundle**。装一次，重启对应界面即可。
+
+| 你在用 | profile | 装法 | 生效方式 |
+|---|---|---|---|
+| 桌面 App（本机就是这个 GUI） | `desktop` | `dsh plugin --profile desktop add github:Verisw/rea-dsh` | 完全退出 App 再打开 |
+| `dsh web`（浏览器里用） | `web` | `dsh plugin --profile web add github:Verisw/rea-dsh` | 重启 `dsh web` |
+| `dsh -p`（headless / 脚本） | `headless` | `dsh plugin --profile headless add github:Verisw/rea-dsh` | 下次运行自动带上 |
+| dsh-tui | `dsh-tui` | `dsh plugin --profile dsh-tui add github:Verisw/rea-dsh` | 重启 TUI |
+
+桌面版和 Web 版共用 `@deepseek-ai/dsh-web-app` 提供的 preset 选择器，两边都只是往同一个
+registry 里添一行；它们是**两个独立 profile**（各自的 `package.json` 与 `node_modules`），装哪个
+只影响哪个界面。
+
+先看本机有哪些 profile、装没装：
 
 ```sh
-dsh plugin --profile desktop add github:Verisw/rea-dsh
-# 本地开发时直接链进去：
-npm run link:desktop          # 把本仓库软链进 ~/.dsh/profiles/desktop/node_modules
+node scripts/install.mjs        # 只列出，不改动
 ```
 
-装完**重启 dsh**。启动时 bundle 的 patch 插一行 preset 声明，选择器里就多出「逆向工程模式」。
-
-从别的目录 clone 也行：本包不含机器相关的绝对路径，技能目录按包位置自解析，分析引擎位置全部来自环境变量。
-
-### B. dsh-tui
-
-dsh-tui 走 profile patch，不是 bundle 清单。把 `tui/profile.patch.yml` 那一段并进
-`~/.dsh/profiles/dsh-tui/cordis.patch.yml`，并把 `path` 改成本机仓库位置：
-
-```yaml
-- insert:
-    - id: preset-reverse
-      name: '@deepseek-ai/dsh-agent-preset'
-      config:
-        id: reverse
-        name: 逆向工程模式
-        description: 面向已发布软件的逆向模式。
-        order: 5
-        plugins:
-          - id: reverse-composition
-            name: '@deepseek-ai/cordis-plugin-include'
-            config:
-              path: 'file:///绝对路径/rea-dsh/tui/agent.cordis.yml'
+```text
+profiles under /Users/you/.dsh/profiles:
+  desktop   installed
+  dsh-tui   not installed
+  headless  not installed
+  web       not installed
 ```
 
-`tui/agent.cordis.yml` 由 `npm run sync:tui` 从 `cordis.patch.yml` 生成，不要手改（`npm run verify` 会拦住漂移）。
+本地开发（还没发布到 npm / GitHub 时），把 checkout 直接链进 profile——幂等，可重复跑：
+
+```sh
+npm run link:all         # desktop + web + headless + dsh-tui 全装
+npm run link:web         # 只装其中一个
+npm run unlink:all       # 全卸
+```
+
+`dsh plugin --profile <name>` 对非 desktop profile 会自动按模板初始化；**desktop profile 必须由
+App 自己先建一次**，装的时候先完全退出 App。
+
+装完重启后，用宿主的真实装载链路自查（会调用 `loadProfileDirectory`，不是看文件猜）：
+
+```sh
+npm run verify:profiles
+```
+
+```text
+host 0.2.0-rc.2 (/opt/homebrew/lib/node_modules/@deepseek-ai/dsh/package.json)
+PASS  desktop — preset reverse / 21 plugin rows, layer 5/11, 4 unrelated skip(s)
+PASS  dsh-tui — preset reverse / 21 plugin rows, layer 3/3, 0 unrelated skip(s)
+PASS  headless — preset reverse / 21 plugin rows, layer 3/3, 0 unrelated skip(s)
+PASS  web — preset reverse / 21 plugin rows, layer 6/6, 0 unrelated skip(s)
+
+RESULT PASS — 4 profile(s) compose
+```
+
+没装本包的 profile 显示 `SKIP`，不计失败。从别的目录 clone 也行：本包不含机器相关的绝对路径，
+技能目录按包位置自解析，分析引擎位置全部来自环境变量。
+
+### 回退：profile patch 形态
+
+只有一种情况需要它——你的 dsh 版本不从 `dsh.profile.bundles` 读 bundle。把
+`tui/profile.patch.yml` 那段并进 `<profile>/cordis.patch.yml`，并把 `path` 改成本机绝对路径
+（`tui/agent.cordis.yml` 由 `npm run sync:tui` 从 `cordis.patch.yml` 生成，别手改，`npm run verify`
+会拦住漂移）。bundle 与这段**同时存在会得到两条 `preset-reverse`**，只留一个。
 细节见 [tui/README.md](tui/README.md)。
 
 ---
@@ -96,8 +125,9 @@ preset 声明是 **eager** 的：注册即挂载。所以每次启动都会拉�
 ## 校验
 
 ```sh
-npm install        # 只为拿 js-yaml
-npm run verify     # 结构 + 可移植性 + tui 同构 + 宿主真身校验
+npm install            # 只为拿 js-yaml
+npm run verify         # 结构 + 可移植性 + tui 同构 + 宿主真身校验（离线、与机器无关）
+npm run verify:profiles  # 本机四个 profile 的真实装载结果（没装 dsh 时不可用）
 ```
 
 本机实测输出（dsh 0.2.0-rc.2）：
@@ -130,12 +160,12 @@ RESULT: PASS
 ## 卸载
 
 ```sh
-dsh plugin --profile desktop remove dsh-rea-reverse-preset
+dsh plugin --profile <desktop|web|headless|dsh-tui> remove dsh-rea-reverse-preset
 # 本地软链装的：
-npm run unlink:desktop
+npm run unlink:all
 ```
 
-TUI 侧：删掉 profile patch 里那段 `preset-reverse`，重启即可。
+用的是回退形态（profile patch）的话，删掉那段 `preset-reverse` 再重启。
 旧目录名册（`~/.dsh/.agent-presets/reverse`）在新宿主上本来就不被读取，可留可删。
 
 ---
@@ -147,15 +177,16 @@ TUI 侧：删掉 profile patch 里那段 `preset-reverse`，重启即可。
 ├── cordis.patch.yml              唯一真相：preset 声明 + 组合正文
 ├── package.json                  npm 包 / dsh bundle 元数据
 ├── skills/reverse-workflow/      随包技能（bundledSkillDir 指这里）
-├── tui/
+├── tui/                          回退形态专用（默认用不到）
 │   ├── agent.cordis.yml          生成物：由上面那份 patch 投影出的 entry list
 │   ├── profile.patch.yml         dsh-tui 侧的装载片段
 │   ├── preset.yml                仅 name/description/order 的备忘（旧目录名册用）
 │   └── README.md
 ├── scripts/
-│   ├── verify.mjs                全部校验
+│   ├── verify.mjs                离线校验：结构、可移植性、tui 同构、宿主 schema
+│   ├── check-profiles.mjs        本机校验：每个 profile 的真实装载结果
 │   ├── sync-tui.mjs              生成 / 校验 tui/agent.cordis.yml
-│   └── install-desktop.mjs       本地软链进 desktop profile
+│   └── install.mjs               把 checkout 链进 profile（--profile / --all / --uninstall）
 └── docs/
     ├── architecture.md           装载链路、realm、!!js 求值、可移植性策略
     └── troubleshooting.md        静默失败路径与实测数据

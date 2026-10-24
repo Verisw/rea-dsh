@@ -19,3 +19,5 @@ jobs:
         run: npm run verify
       - name: check the tui twin is in sync
         run: npm run sync:tui:check
+      - name: installer still parses under an empty DSH_HOME
+        run: DSH_HOME="$(mktemp -d)" node scripts/install.mjs

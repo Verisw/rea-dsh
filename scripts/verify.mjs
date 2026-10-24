@@ -78,6 +78,15 @@ const shipped = ['cordis.patch.yml', ...(pkg.files ?? [])];
 const missing = [...new Set(shipped)].filter((entry) => !existsSync(join(root, entry)));
 if (missing.length === 0) ok('every published file exists', `${new Set(shipped).size} entries`); else bad('every published file exists', `missing: ${missing.join(', ')}`);
 
+// every "node scripts/x.mjs" a npm script points at must exist: renames must not rot the CLI surface
+const scriptTargets = Object.entries(pkg.scripts ?? {}).flatMap(([name, command]) => {
+  const match = /node (scripts\/[\w.-]+\.mjs)/.exec(String(command));
+  return match ? [{ name, file: match[1] }] : [];
+});
+const brokenScripts = scriptTargets.filter((entry) => !existsSync(join(root, entry.file)));
+if (brokenScripts.length === 0) ok('every npm script target exists', `${scriptTargets.length} scripts`);
+else bad('every npm script target exists', brokenScripts.map((entry) => `${entry.name} -> ${entry.file}`).join(', '));
+
 // ── 2. the patch parses and declares exactly one preset ─────────────────────
 group('preset declaration');
 

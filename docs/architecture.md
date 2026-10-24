@@ -92,17 +92,47 @@ static inject = ["agentPresets"]
 
 ---
 
-## 4. 两种落地点
+## 4. 一处落点，四个 profile
 
-| | 桌面 / Web | dsh-tui |
-|---|---|---|
-| 落地点 | bundle 的 `cordis.patch.yml` | profile patch 的 include 行 |
-| 组合形态 | 声明行内联 `config.plugins` | 声明行 + `cordis-plugin-include` 指向 `tui/agent.cordis.yml` |
-| 谁生成 | 手写（唯一真相） | `npm run sync:tui` |
-| `ctx.baseUrl` | `file://<profile>/` | `file://<仓库>/tui/` |
+一个 bundle 就能覆盖本机全部四种界面。宿主侧的证据链（`scripts/check-profiles.mjs` 每次跑都在复核）：
 
-两份组合必须逐行一致，靠 `verify.mjs` 的深比较守住（`tui composition equals the patch composition`）。
+```text
+host 0.2.0-rc.2 (/opt/homebrew/lib/node_modules/@deepseek-ai/dsh/package.json)
+PASS  desktop — preset reverse / 21 plugin rows, layer 5/11
+PASS  dsh-tui — preset reverse / 21 plugin rows, layer 3/3
+PASS  headless — preset reverse / 21 plugin rows, layer 3/3
+PASS  web — preset reverse / 21 plugin rows, layer 6/6
+```
+
+| 界面 | profile | 谁提供 preset 管道 | bundle 层序 |
+|---|---|---|---|
+| 桌面 App（Electron，本机 Web GUI 也是它） | `desktop` | `@deepseek-ai/dsh-web-app` | 5/11 |
+| `dsh web`（浏览器访问） | `web` | `@deepseek-ai/dsh-web-app` | 6/6 |
+| `dsh -p`（headless） | `headless` | `@deepseek-ai/dsh-base` | 3/3 |
+| dsh-tui | `dsh-tui` | `@deepseek-harness-tui/dsh-tui` | 3/3 |
+
+- 四个 profile 的 `package.json` 都有 `dsh.profile.bundles`，boot 走同一个
+  `loadProfileDirectory` → `bundlePatchPaths` → `applyEntryPatches`。preset 声明只是被塞进同一张
+  清单，与「谁写的」无关，所以 bundle 形态在 TUI 上同样成立。
+- 桌面与 web 是两个独立 profile（各自的 `node_modules`），但 preset 选择器都来自
+  `dsh-web-app` 插入的 `agent-preset-registry` + `ui-agent-preset`，装到哪个只影响哪个界面。
+- 曾被误认为「TUI 必须走 patch」的原因：TUI 文档里那句「registry 既不扫描目录也不接受 preset
+  路径」说的是 `~/.dsh/.agent-presets/` 目录名册，与 `dsh.profile.bundles` 是两件事。
+
+### 回退：patch 形态（`tui/`）
+
+只有当宿主不从 `dsh.profile.bundles` 读 bundle 时才用，形态是「声明行 + `cordis-plugin-include`
+指向 `tui/agent.cordis.yml`」，由 `npm run sync:tui` 从 `cordis.patch.yml` 生成；两者逐行一致由
+`verify.mjs` 的深比较守住（`tui composition equals the patch composition`）。
 早期做法是「两份手抄 + 靠自觉同步」，实测已经漂移过，所以改成生成。
+
+patch 形态的两个隐藏差异，写下来免得再踩：
+
+| | bundle 形态 | patch 形态 |
+|---|---|---|
+| 声明行 | 在 bundle 层，早于 profile patch | 在 profile patch 里，最后应用 |
+| `ctx.baseUrl` | `file://<profile>/` | `file://<仓库>/tui/` |
+| 与 bundle 共存 | — | 同一 id 出现两次，assembly 里两行 |
 
 ---
 

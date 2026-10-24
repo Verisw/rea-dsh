@@ -1,6 +1,14 @@
-# dsh-tui 侧
+# 回退形态：profile patch（默认用不到）
 
-同一个逆向工程模式，在 **dsh-tui** 上的落地形态。内容与桌面 bundle 一致：REA 的 MCP 工具 +
+> **先读这段。** 1.0.0 起 bundle 本身就覆盖四个 profile（`desktop` / `web` / `headless` /
+> `dsh-tui`），装法是 `npm run link:all` 或 `dsh plugin --profile <name> add github:Verisw/rea-dsh`，
+> 不需要本目录。实测：`npm run verify:profiles` 在四个 profile 上都能从 bundle 层装载出
+> `preset-reverse`（21 行插件）。
+>
+> 只有当你的 dsh 版本**不从 `dsh.profile.bundles` 读 bundle** 时，才走下面的 patch 形态。
+> 两者同时生效会得到两条 `preset-reverse`，assembly 里会看到重复行。
+
+同一个逆向工程模式，在 **dsh-tui** 上的补丁式落地形态。内容与 bundle 一致：REA 的 MCP 工具 +
 逆向工程人设 + 逆向工作流技能；差异只在**怎么装**。
 
 ```text

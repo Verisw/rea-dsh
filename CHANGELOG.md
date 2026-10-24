@@ -7,6 +7,13 @@
 
 首个公开版本。
 
+### 文档
+
+- README 改为双语入口：两个文件顶部互链（当前语言加粗），并补上 verify / license /
+  node / dsh / 工具数徽章；`docs/` 仍是中文，英文页明确标注这一点。
+- `npm run verify` 新增 `docs` 段：两个 README 必须互相链接、所有相对链接必须能落地、
+  都必须出现包名——防止开关或改名之后留下死链。
+
 ### 发布自动化
 
 - 新增 `.github/workflows/release.yml`：推 `v*` tag 时先跑 `verify` /

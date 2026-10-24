@@ -1,5 +1,15 @@
 # dsh-rea-reverse-preset
 
+**English** · [简体中文](README.md) · [Architecture](docs/architecture.md) · [Troubleshooting](docs/troubleshooting.md) · [Changelog](CHANGELOG.md)
+
+[![verify](https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml/badge.svg)](https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![node](https://img.shields.io/badge/node-%E2%89%A520.16-brightgreen.svg)](package.json)
+[![dsh](https://img.shields.io/badge/dsh-0.2.0--rc.2%20%E2%80%A6%200.3-blueviolet.svg)](docs/architecture.md)
+[![tools](https://img.shields.io/badge/REA%20tools-139-informational.svg)](https://github.com/morluto/rea)
+
+> The documents under `docs/` are written in Chinese; this README and the code comments are bilingual.
+
 A **reverse-engineering mode** for **DeepSeek Harness (dsh)**.
 
 It adds one entry to the dsh preset picker. Select it and the agent carries the reverse-engineering

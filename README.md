@@ -1,5 +1,13 @@
 # dsh-rea-reverse-preset
 
+**简体中文** · [English](README.en.md) · [架构说明](docs/architecture.md) · [排障手册](docs/troubleshooting.md) · [更新日志](CHANGELOG.md)
+
+[![verify](https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml/badge.svg)](https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![node](https://img.shields.io/badge/node-%E2%89%A520.16-brightgreen.svg)](package.json)
+[![dsh](https://img.shields.io/badge/dsh-0.2.0--rc.2%20%E2%80%A6%200.3-blueviolet.svg)](docs/architecture.md)
+[![tools](https://img.shields.io/badge/REA%20tools-139-informational.svg)](https://github.com/morluto/rea)
+
 给 **DeepSeek Harness（dsh）** 加一个「逆向工程模式」。
 
 在 dsh 的 preset 选择器里会多出一项 **逆向工程模式**，选中后 agent 就带着 [REA](https://github.com/morluto/rea)

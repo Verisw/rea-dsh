@@ -87,6 +87,35 @@ const brokenScripts = scriptTargets.filter((entry) => !existsSync(join(root, ent
 if (brokenScripts.length === 0) ok('every npm script target exists', `${scriptTargets.length} scripts`);
 else bad('every npm script target exists', brokenScripts.map((entry) => `${entry.name} -> ${entry.file}`).join(', '));
 
+// ── 1b. the two READMEs stay in step ───────────────────────────────────────
+group('docs');
+
+const readmes = ['README.md', 'README.en.md'];
+const texts = Object.fromEntries(readmes.map((name) => [name, readFileSync(join(root, name), 'utf8')]));
+
+const switchers = [['README.md', 'README.en.md'], ['README.en.md', 'README.md']].filter(
+  ([from, to]) => !texts[from].includes('](' + to + ')'),
+);
+if (switchers.length === 0) ok('each README links the other', 'README.md <-> README.en.md');
+else bad('each README links the other', switchers.map(([from, to]) => from + ' -> ' + to).join(', '));
+
+const linkPattern = /\]\(([^)\s]+)\)/g;
+const dead = [];
+for (const name of readmes) {
+  for (const match of texts[name].matchAll(linkPattern)) {
+    const target = match[1];
+    if (/^(https?:|mailto:|#)/.test(target)) continue;
+    const path = target.split('#')[0];
+    if (!path) continue;
+    if (!existsSync(join(root, path))) dead.push(name + ' -> ' + target);
+  }
+}
+if (dead.length === 0) ok('every relative link in the READMEs resolves', readmes.join(', '));
+else bad('every relative link in the READMEs resolves', dead.join(', '));
+
+if (readmes.every((name) => texts[name].includes(pkg.name))) ok('both READMEs name the package', pkg.name);
+else bad('both READMEs name the package', pkg.name);
+
 // ── 2. the patch parses and declares exactly one preset ─────────────────────
 group('preset declaration');
 

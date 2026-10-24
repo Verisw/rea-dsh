@@ -26,6 +26,7 @@ A missing engine only removes its own group of tools; everything else keeps work
 | One bundle, four surfaces | Desktop app, `dsh web`, dsh-tui and headless share the same bundle — no per-surface config. |
 | Leaves the host alone | It only adds a subtree to a preset; permissions, model routing, sandbox and persistence stay yours. |
 | Portable | No machine-specific paths; engine locations come from environment variables. |
+| Never resident | No engine at host boot: the tool list comes from a local manifest, REA starts on the first real tool call and stops itself after 10 idle minutes. |
 | Fails softly | If REA cannot start, the mode is still selectable — just without its tools. |
 | Clean uninstall | Remove the bundle and you are back to stock; the shipped composition is untouched. |
 | Self-checking | `npm run verify` checks structure and portability offline; `verify:profiles` replays the real host loading path. |
@@ -45,6 +46,7 @@ Java / IDA, runs the checks, and prints a restart list. No questions, and re-run
 ```sh
 npx -y dsh-rea-reverse-preset setup --check   # report only
 npm run setup -- --write-env                  # write probed engine paths into ~/.zshrc
+npm run setup -- --warm                       # fetch REA now and build the tool manifest
 npm run setup -- --uninstall                  # remove from every surface
 ```
 
@@ -70,14 +72,18 @@ node scripts/install.mjs
 
 1. Restart that surface.
 2. `/preset` → **逆向工程模式** (reverse engineering), or `/preset reverse` directly.
-3. `/mcp` to confirm REA came up; its tools are named `mcp__rea__*`.
+3. `/mcp` lists the `mcp__rea__*` tools; the engine itself starts on the first real call.
 4. Point it at a sample and say what you want to know — behaviour, protocol, validation logic, version diffs.
 
 Two things worth knowing:
 
 - **A session with conversation history cannot switch presets** — start a new session.
-- The mode mounts with the host, so every startup launches REA once (about 1.4 s warm, 3.7 s cold).
-  Run `npm run setup -- --warm` once to pre-warm the npx cache; the first launch can otherwise take a minute.
+- **The engine is not resident.** Mounting the mode starts a small supervisor only; the tool list is read
+  from a local manifest (`~/.dsh/cache/dsh-rea-reverse-preset/`) so all 139 tools are still registered.
+  REA itself starts on the first real `mcp__rea__*` call (1–2 s warm) and stops after 10 idle minutes,
+  then starts again on the next call.
+  A fresh machine has no manifest yet, so the first startup launches REA once to build it — or run
+  `npm run setup -- --warm` to do that up front, which also downloads the npx package.
 
 ### Engine locations (optional)
 
@@ -91,6 +97,8 @@ non-default location.
 | `JAVA_HOME` | JVM used by Ghidra; only needed when the `java` on PATH is too old. |
 | `REA_IDA_MCP_CONFIG` | IDA MCP config file — the switch for IDA 9.x. |
 | `REA_MCP_SPEC` | Override the REA version, e.g. `REA_MCP_SPEC=rea-agents@6.7.0`, without editing this package. |
+| `REA_LAZY_IDLE_MS` | Idle milliseconds before the engine stops itself; default `600000` (10 minutes), `0` keeps it running. |
+| `REA_LAZY_MODE` | `eager` restores the old behaviour (start at host boot); default `lazy`. |
 
 dsh reads these at startup, so **restart after changing them**. An empty string counts as unset and is dropped.
 
@@ -110,6 +118,7 @@ npm run unlink:all        # when installed through local symlinks
 | Fewer tools than expected | That engine was not found (IDA, typically) — expected behaviour. |
 | Skills not mounted | The package was moved, or two copies are installed in one profile. |
 | Config changes ignored | dsh reads this at startup only; restart the process. |
+| A `rea mcp` process with no reverse session open | An older build that connected directly, or `REA_LAZY_MODE=eager`. |
 
 Step-by-step diagnosis: [docs/troubleshooting.md](docs/troubleshooting.md).
 

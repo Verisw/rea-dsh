@@ -26,6 +26,21 @@
     全部改为读环境变量，空串被过滤；Hopper 的 macOS 默认路径仅在文件存在时采用。
 - REA 版本仍 pin `rea-agents@6.3.0`，可用 `REA_MCP_SPEC` 覆盖，无需改包。
 
+### 生命周期
+
+- 新增 `scripts/rea-lazy.mjs`：夹在宿主与 REA 之间的 stdio MCP 转接层。
+  宿主启动时它只回答 `initialize` / `tools/list`（清单来自
+  `<dsh home>/cache/dsh-rea-reverse-preset/manifest-<spec>.json`），139 个工具照常注册；
+  第一次真实 `tools/call` 才拉起 REA，静默 `REA_LAZY_IDLE_MS`（默认 10 分钟）后自动停止。
+  实测：冷缓存握手 52 ms / 22 ms，零 REA 进程；首次调用 1.6 s 拉起；idle 停止后无残留进程。
+- `mcp-rea` 行改为 `command: !!js process.execPath` + 自解析 `scripts/rea-lazy.mjs`，
+  桌面 App 下自动带 `ELECTRON_RUN_AS_NODE=1`；REA 以独立进程组启动，
+  停止时对整组发信号，避免 `npx` 包装进程被杀而 `rea mcp` 变孤儿。
+- 新增 `REA_LAZY_IDLE_MS` / `REA_LAZY_MODE` / `REA_LAZY_CACHE` 三个环境变量；
+  `REA_LAZY_MODE=eager` 可退回旧行为。
+- `npm run setup -- --warm` 改为走转接层跑一遍握手：既下好 npx 包，也把工具清单缓存生成好，
+  之后每次宿主启动都是零引擎。
+
 ### 新增
 
 - `npm run setup`（`scripts/setup.mjs`，也注册为 `dsh-rea-setup` bin）：一键流程——
@@ -57,7 +72,8 @@
 
 ### 已知问题
 
-- preset 声明 eager 挂载，启动即拉起 REA（热 ~1.4 s、冷 ~3.7 s）。
+- 全新机器首次启动仍会拉起一次 REA：没有清单就不知道有哪些工具。跑一次
+  `npm run setup -- --warm` 可把这一步前置，之后不再出现。
 - 已有对话历史的会话不能切换 preset（宿主约束）。
 
 ## [0.x] - 2026-10 之前（未公开）

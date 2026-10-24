@@ -35,10 +35,15 @@
 #     `ptc` presentation they collapse into a code-call surface the model must
 #     learn before it can reach them. Several deployments default to `ptc`, so
 #     the pin is stated rather than inherited.
-#   * `mcp-rea` carries `failOnStartupError: false`. A cold npx cache or an
-#     offline machine then leaves the mode without REA tools and a loud log line,
-#     instead of failing the whole preset so no reverse session can start.
-#     docs/troubleshooting.md lists the symptoms and the two-minute diagnosis.
+#   * `mcp-rea` points at this package's own stdio supervisor,
+#     `scripts/rea-lazy.mjs`, instead of spawning REA directly. The supervisor
+#     answers `initialize` and the list requests from a cached manifest, so the
+#     mode still advertises every REA tool while REA itself starts on the first
+#     real tool call and stops itself after `REA_LAZY_IDLE_MS` of quiet. Paired
+#     with `failOnStartupError: false` the result is: no analysis engine at host
+#     boot, and a dead engine degrades to a loud log line instead of a preset
+#     that refuses to mount. docs/architecture.md has the state machine;
+#     docs/troubleshooting.md has the diagnosis.
 
 - insert:
     - id: preset-reverse
@@ -58,19 +63,18 @@
             config:
               serverName: rea
               transport: stdio
-              command: npx
-              # `--prefer-offline` is load-bearing. Measured: with a warm npx
-              # cache and an unreachable registry a bare `npx -y` took ~71 s,
-              # past the MCP SDK's 60 s request timeout, which silently drops
-              # every REA tool. With the flag the same case settles in ~1.4 s,
-              # and a cold machine can still install from the network.
-              #
-              # `mcp` must be the ONLY argument REA's bin receives; any further
-              # flag makes it fall through to its CLI branch.
-              #
-              # REA_MCP_SPEC overrides the pin without editing this file.
+              # The supervisor, not REA. `process.execPath` is the host's own
+              # runtime — node under dsh-tui and headless, the Electron binary
+              # under the desktop app (with ELECTRON_RUN_AS_NODE below) — so no
+              # second interpreter has to exist on PATH.
+              command: !!js >-
+                process.execPath
+              # Resolve the supervisor from the package itself, the same way
+              # `bundledSkillDir` does: the installed-package anchor first, the
+              # path relative to the mounting file second. Both anchors are
+              # correct for one of the four profiles; the first that exists wins.
               args: !!js >-
-                ['--prefer-offline', '-y', process.env.REA_MCP_SPEC || 'rea-agents@6.3.0', 'mcp']
+                (() => { const { createRequire } = process.getBuiltinModule('node:module'); const { fileURLToPath } = process.getBuiltinModule('node:url'); const { existsSync } = process.getBuiltinModule('node:fs'); const anchor = ctx.baseUrl || baseUrl; const fallback = () => fileURLToPath(new URL('../scripts/rea-lazy.mjs', anchor)); const candidates = []; try { candidates.push(createRequire(anchor).resolve('dsh-rea-reverse-preset/scripts/rea-lazy.mjs')); } catch {} try { candidates.push(fallback()); } catch {} const found = candidates.find((value) => typeof value === 'string' && existsSync(value)); return [found || fallback()]; })()
               # Every engine location is opt-in from the environment. An unset
               # key is omitted rather than passed empty: REA treats
               # `HOPPER_LAUNCHER_PATH=''` as a configuration error and then stops
@@ -81,8 +85,16 @@
               # application.properties reports the version rea-agents verifies
               # (12.1.4 for the pinned build). JAVA_HOME is only needed when the
               # JVM on PATH is older than the one Ghidra requires.
+              #
+              # These variables reach the supervisor, which passes its own
+              # environment on to REA, so one list covers both processes.
+              # ELECTRON_RUN_AS_NODE is what lets `process.execPath` behave as a
+              # node runtime inside the desktop app; REA_LAZY_* tune the
+              # supervisor (idle timeout in ms, 0 disables the auto-stop, lazy vs
+              # eager mode, manifest cache location) and REA_MCP_SPEC re-pins the
+              # REA build without editing this file.
               env: !!js >-
-                (() => { const { existsSync } = process.getBuiltinModule('node:fs'); const hopperDefault = process.platform === 'darwin' && process.env.HOME ? process.env.HOME + '/Applications/Hopper Disassembler.app/Contents/MacOS/hopper' : undefined; return Object.fromEntries(Object.entries({ HOPPER_LAUNCHER_PATH: process.env.HOPPER_LAUNCHER_PATH || (hopperDefault && existsSync(hopperDefault) ? hopperDefault : undefined), GHIDRA_INSTALL_DIR: process.env.GHIDRA_INSTALL_DIR, JAVA_HOME: process.env.JAVA_HOME, REA_IDA_MCP_CONFIG: process.env.REA_IDA_MCP_CONFIG }).filter(([, value]) => typeof value === 'string' && value !== '')); })()
+                (() => { const { existsSync } = process.getBuiltinModule('node:fs'); const hopperDefault = process.platform === 'darwin' && process.env.HOME ? process.env.HOME + '/Applications/Hopper Disassembler.app/Contents/MacOS/hopper' : undefined; return Object.fromEntries(Object.entries({ HOPPER_LAUNCHER_PATH: process.env.HOPPER_LAUNCHER_PATH || (hopperDefault && existsSync(hopperDefault) ? hopperDefault : undefined), GHIDRA_INSTALL_DIR: process.env.GHIDRA_INSTALL_DIR, JAVA_HOME: process.env.JAVA_HOME, REA_IDA_MCP_CONFIG: process.env.REA_IDA_MCP_CONFIG, ELECTRON_RUN_AS_NODE: process.versions.electron ? '1' : undefined, REA_MCP_SPEC: process.env.REA_MCP_SPEC || 'rea-agents@6.3.0', REA_LAZY_IDLE_MS: process.env.REA_LAZY_IDLE_MS, REA_LAZY_MODE: process.env.REA_LAZY_MODE, REA_LAZY_CACHE: process.env.REA_LAZY_CACHE }).filter(([, value]) => typeof value === 'string' && value !== '')); })()
               # REA's own timeout is per analysis call; this one bounds a single
               # MCP request so a stuck provider cannot hold the turn open.
               toolCallTimeoutMs: 600000

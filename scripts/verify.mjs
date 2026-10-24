@@ -170,14 +170,31 @@ if (patchDoc) {
     if (c.failOnStartupError === false) ok('a dead REA leaves the preset selectable', 'failOnStartupError: false'); else bad('a dead REA leaves the preset selectable', String(c.failOnStartupError));
 
     const env = evalRow(rea, Object.create({ baseUrl: `${pathToFileURL(root).href}/` }));
-    const args = env.args;
-    if (Array.isArray(args)) {
-      if (args.includes('--prefer-offline')) ok('npx keeps `--prefer-offline`'); else bad('npx keeps `--prefer-offline`', JSON.stringify(args));
-      const positional = args.filter((value) => !String(value).startsWith('-'));
-      if (positional.length === 2 && positional[1] === 'mcp') ok('exactly one positional reaches REA', positional.join(' '));
-      else bad('exactly one positional reaches REA', JSON.stringify(positional));
-      if (String(positional[0]).startsWith('rea-agents@')) ok('REA is pinned by spec', positional[0]); else bad('REA is pinned by spec', String(positional[0]));
-    } else bad('mcp-rea.args evaluates to an array', JSON.stringify(args));
+    const proxy = join(root, 'scripts', 'rea-lazy.mjs');
+    if (env.command === process.execPath) ok('the row launches the host runtime', env.command);
+    else bad('the row launches the host runtime', String(env.command?.error ?? env.command));
+
+    // The supervisor has to be reachable from every anchor a profile can give:
+    // the installed package (desktop / web / headless / dsh-tui bundle) and the
+    // dsh-tui include directory (fallback shape).
+    const placements = [
+      ['installed profile', () => {
+        const fake = join(tmpdir(), `rea-dsh-verify-proxy-${process.pid}`);
+        rmSync(fake, { recursive: true, force: true });
+        mkdirSync(join(fake, 'node_modules'), { recursive: true });
+        symlinkSync(root, join(fake, 'node_modules', 'dsh-rea-reverse-preset'), 'dir');
+        return { baseUrl: `${pathToFileURL(fake).href}/`, cleanup: () => rmSync(fake, { recursive: true, force: true }) };
+      }],
+      ['tui include', () => ({ baseUrl: `${pathToFileURL(join(root, 'tui')).href}/`, cleanup: () => {} })],
+    ];
+    for (const [label, make] of placements) {
+      const { baseUrl, cleanup } = make();
+      const resolved = evalRow(rea, Object.create({ baseUrl })).args;
+      cleanup();
+      const path0 = Array.isArray(resolved) ? resolved[0] : undefined;
+      if (typeof path0 === 'string' && existsSync(path0) && path0.endsWith('rea-lazy.mjs')) ok(`the supervisor resolves from the ${label}`, path0);
+      else bad(`the supervisor resolves from the ${label}`, JSON.stringify(resolved?.error ?? resolved));
+    }
 
     const envValues = env.env;
     if (envValues && typeof envValues === 'object' && !envValues.error) {
@@ -186,9 +203,21 @@ if (patchDoc) {
       else bad('every env value is a non-empty string', JSON.stringify(badValues));
     } else bad('mcp-rea.env evaluates to an object', JSON.stringify(envValues?.error ?? envValues ?? null));
 
-    if (!existsSync(join(root, 'cordis.patch.yml')) || !/rea-agents@\d/.test(readFileSync(join(root, 'cordis.patch.yml'), 'utf8'))) {
-      bad('REA version is pinned in the source', 'no rea-agents@<version> literal');
-    }
+    // What used to live in the row (the npx launch line and its pin) now lives
+    // in the supervisor. Assert it there, so a rewrite of the proxy cannot
+    // silently drop the two load-bearing details.
+    const source = existsSync(proxy) ? readFileSync(proxy, 'utf8') : '';
+    if (source) {
+      if (source.includes("'--prefer-offline'")) ok('the supervisor keeps `--prefer-offline`');
+      else bad('the supervisor keeps `--prefer-offline`', 'no --prefer-offline literal');
+      if (/rea-agents@\d/.test(source)) ok('the supervisor pins a REA build');
+      else bad('the supervisor pins a REA build', 'no rea-agents@<version> literal');
+      if (/spawn\(/.test(source) && /'mcp'/.test(source)) ok('the supervisor spawns `mcp` as the only REA verb');
+      else bad('the supervisor spawns `mcp` as the only REA verb');
+      for (const knob of ['REA_LAZY_MODE', 'REA_LAZY_IDLE_MS', 'REA_LAZY_CACHE', 'REA_MCP_SPEC']) {
+        if (source.includes(knob)) ok(`the supervisor reads ${knob}`); else bad(`the supervisor reads ${knob}`);
+      }
+    } else bad('scripts/rea-lazy.mjs exists');
   }
 
   // ── 4. the skill row ──────────────────────────────────────────────────────

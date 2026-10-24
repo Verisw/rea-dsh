@@ -13,6 +13,8 @@
 | 切 preset 被拒绝 | 会话已有历史 | §6 |
 | 把 preset 目录放进 `~/.dsh/.agent-presets/` 没用 | registry 不扫描目录 | §7 |
 | 某一整行被禁用 | peer 冲突，`prepareProfileEntries` 主动 disabled | §8 |
+| 没开逆向模式，却有个 `rea mcp` 进程常驻 | 老版本直连 REA，或设了 `REA_LAZY_MODE=eager` | §9 |
+| 工具都在，但第一次调用要等一两秒 | lazy 层按需拉起引擎，正常；想提前做完跑 `setup -- --warm` | §9 |
 
 ---
 
@@ -100,7 +102,8 @@ npm run verify     # 看 bundledSkillDir 那三行
 ## 7. `~/.dsh/.agent-presets/<id>/` 不生效
 
 这一版宿主的 `agent-preset-registry` 只接受注册，不扫描目录、不接受路径。
-目录名册是死配置。落地方式只有两种：bundle patch（桌面）或 profile patch（TUI）。
+目录名册是死配置。落地方式只有一种：`dsh.profile.bundles` 里的 bundle patch，
+四个 profile（desktop / web / headless / dsh-tui）共用；profile patch 只是回退形态。
 仓库里的 `tui/preset.yml` 只是给人看的备忘，不参与装载。
 
 ## 8. 整行被禁用 / bundle 被跳过
@@ -114,6 +117,33 @@ npm run verify     # 看 bundledSkillDir 那三行
 
 兼容性检查只看 `@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*` 命名的 peer，按
 `{ includePrerelease: true }` 比较——`0.2.0-rc.2` 这类预发布号能正常匹配。
+
+## 9. 引擎的生命周期（lazy 层）
+
+`mcp-rea` 那一行连的不是 REA，是本包的 `scripts/rea-lazy.mjs`。它在启动时只回答
+`initialize` / `tools/list`，清单来自缓存；`tools/call` 这类真实请求才拉起引擎。
+
+三种现象都是在说同一件事：
+
+| 现象 | 含义 | 处理 |
+|---|---|---|
+| 一开 dsh 就有 `rea mcp` 进程 | 不是本版本的行为 | 确认装的包版本 ≥ 1.0.0，装完重启界面；再过 `ps -o pid,ppid,command -ax \| grep 'rea mcp'`，父进程应该是 dsh 主进程而不是 `npx` |
+| 引擎一直不退 | `REA_LAZY_IDLE_MS=0`，或会话里确实一直有工具调用（每次调用都会重置计时） | 不设那就默认 10 分钟；想更短比如 `REA_LAZY_IDLE_MS=120000` |
+| 第一次 `tools/call` 慢 1–2 s | cold → hot 的代价，仅此一次 | 正常。想消掉它跑 `npm run setup -- --warm` 预生成清单 |
+
+想退回旧行为（启动即拉起）设 `REA_LAZY_MODE=eager`，其余照旧。
+
+清单文件在 `${DSH_HOME:-~/.dsh}/cache/dsh-rea-reverse-preset/manifest-<spec>.json`，
+1.8 MB 上下。删掉不会坏：下次启动会重新拉起一次 REA 采样。换了 `REA_MCP_SPEC` 时文件名跟着变，
+不会读到旧清单。
+
+手动看它一眼：
+
+```sh
+# 转接层自己的日志（每次启动、拉起、停止都会打一行）
+# 在宿主 stderr 里，形如 [rea-lazy] starting REA (rea-agents@6.3.0)
+ps -Ao pid,ppid,etime,command | grep -E 'rea mcp|rea-lazy' | grep -v grep
+```
 
 ---
 

@@ -19,7 +19,12 @@ npm run setup        # 一键：装进本机所有 profile 并校验（= 下面�
 npm run sync:tui     # 改完 patch 之后
 npm run verify       # 必须 PASS（离线、与机器无关）
 npm run verify:profiles   # 本机装了 dsh 的话：四个 profile 的真实装载结果
+node scripts/setup.mjs --warm   # 改了 scripts/rea-lazy.mjs 之后：真跑一遍握手与 idle 停止
 ```
+
+`scripts/rea-lazy.mjs` 是唯一有运行期状态的脚本（子进程、计时器、清单缓存）。
+它的约定写在文件头：`REA_LAZY_MODE` / `REA_LAZY_IDLE_MS` / `REA_LAZY_CACHE` / `REA_MCP_SPEC`。
+改它之后至少验证三件事——冷缓存握手不 spawn、首次调用能拉起、idle 之后进程组里没有残留。
 
 ## 提交前自查
 
@@ -32,6 +37,8 @@ npm run verify:profiles   # 本机装了 dsh 的话：四个 profile 的真实�
       `''` 会被 REA 当成显式配置）。
 - [ ] 服务行放在带 `isolate` 的 group 里；新增 group 时想清楚「谁在 realm 外读这个服务」。
 - [ ] 相对当前 `standard` 基座的 diff 仍然只有预期的几处（`verify` 会打印 added/missing 的 WARN）。
+- [ ] 动过 `scripts/rea-lazy.mjs` 的话：`node --check` 通过，且上面的 warm 跑完能打印出
+      `拿到 139 个工具`；子进程仍然用 `detached: true` + 进程组信号停止（否则会留孤儿引擎）。
 
 ## 关于 `standard` 基座
 

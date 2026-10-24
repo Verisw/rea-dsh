@@ -23,6 +23,7 @@
 | 一条命令装好 | `npm run setup` 装进所有界面，顺手探引擎、自检，最后告诉你重启哪一个。 |
 | 一套覆盖四个界面 | 桌面 App、`dsh web`、dsh-tui、headless 共用同一份 bundle，不用各写一份配置。 |
 | 不动宿主 | 只在 preset 里加一棵子树；权限、模型路由、沙箱、持久化仍由你的部署决定。 |
+| 不常驻 | 宿主启动时不拉引擎：工具清单来自本地缓存，第一次真正调用工具才起 REA，静默 10 分钟自动退出。 |
 | 换机器不用改文件 | 包里没有任何机器相关路径，引擎位置全走环境变量。 |
 | 坏了不影响主流程 | REA 起不来时模式仍可选，只是少一组工具，不会把 dsh 拖崩。 |
 | 卸载干净 | 摘掉 bundle 就回到原状，宿主自带组合一行未改。 |
@@ -43,6 +44,7 @@ npm run setup                         # 从 checkout 跑
 ```sh
 npx -y dsh-rea-reverse-preset setup --check   # 只看状态，不动文件
 npm run setup -- --write-env                  # 把探到的引擎路径写进 ~/.zshrc
+npm run setup -- --warm                       # 预热：把 REA 下好，并生成工具清单缓存
 npm run setup -- --uninstall                  # 从所有界面卸掉
 ```
 
@@ -80,8 +82,12 @@ profiles under /Users/you/.dsh/profiles:
 有两点需要知道：
 
 - **已经产生过对话的会话不能切 preset**，新开一个会话再切。
-- 模式是随宿主启动一起挂载的，所以每次启动都会拉起一次 REA（热缓存约 1.4 s，冷缓存约 3.7 s）。
-  首次用建议先跑 `npm run setup -- --warm` 把 npx 缓存预热，否则第一次可能等上一分钟。
+- **引擎不常驻**。模式挂载时 dsh 只启动一个很轻的转接进程，工具清单直接从本地缓存
+  （`~/.dsh/cache/dsh-rea-reverse-preset/`）读出来给宿主，139 个工具照样在列；
+  第一次真正调用 `mcp__rea__*` 才把 REA 拉起来（热缓存约 1–2 s），之后静默 10 分钟自动退出，
+  下次调用再起。已经开着逆向会话也不会闲着占内存。
+  缓存还没生成时（全新机器）第一次启动会拉起一次 REA 来填清单，跑
+  `npm run setup -- --warm` 可以提前把这步做完，也顺带把 npx 的那份包下好。
 
 ### 引擎位置（可选）
 
@@ -94,6 +100,8 @@ profiles under /Users/you/.dsh/profiles:
 | `JAVA_HOME` | Ghidra 用的 JVM；PATH 上的 `java` 版本不够新时才需要。 |
 | `REA_IDA_MCP_CONFIG` | IDA MCP 配置文件，IDA 9.x 走这个开关。 |
 | `REA_MCP_SPEC` | 换 REA 版本，例如 `REA_MCP_SPEC=rea-agents@6.7.0`，不用改本包。 |
+| `REA_LAZY_IDLE_MS` | 引擎静默多久自动退出，毫秒，默认 `600000`（10 分钟）；`0` 表示不退出。 |
+| `REA_LAZY_MODE` | 填 `eager` 退回旧行为（宿主启动就拉起 REA），默认 `lazy`。 |
 
 这些变量由 dsh 进程读取，**改完要重启界面**。写成空字符串等于没配，会被自动忽略。
 
@@ -113,6 +121,7 @@ npm run unlink:all        # 本地软链安装的用这个
 | 工具少了几十个 | 对应引擎没找到（例如没配 IDA），这是预期行为。 |
 | 技能没挂上 | 包路径被移动过，或 profile 里同时装了两份。 |
 | 改了配置不生效 | dsh 只在启动时读取这些设置，必须重启进程。 |
+| 没开逆向模式却有个 `rea mcp` 进程 | 老版本装的是直连版（启动即拉起），或设了 `REA_LAZY_MODE=eager`。 |
 
 逐条排查步骤见 [docs/troubleshooting.md](docs/troubleshooting.md)。
 

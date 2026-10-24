@@ -5,7 +5,7 @@
  *   npm run setup                  # 检查环境 -> 装进所有 profile -> 校验 -> 告诉你重启什么
  *   npm run setup -- --check       # 只看状态，不动任何文件
  *   npm run setup -- --write-env   # 顺便把分析引擎路径写进 shell 配置（带标记块，幂等）
- *   npm run setup -- --warm        # 预热 REA 的 npx 缓存（首次约 70 s，之后约 1.4 s）
+ *   npm run setup -- --warm        # 预热：下 REA 包 + 生成工具清单缓存（之后宿主启动零引擎）
  *   npm run setup -- --uninstall   # 从所有 profile 卸掉
  *   npm run setup -- --dry-run     # 只说要做会什么
  *
@@ -18,7 +18,7 @@
  *   - 从 npm 包或 npx 里跑       -> 调 dsh plugin --profile <p> add <包名@版本>
  */
 
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -279,16 +279,69 @@ if (Object.keys(env).length > 0) {
 }
 
 // ── 4. 预热 REA ────────────────────────────────────────────────────────────
+
+// Walks the supervisor through one handshake. Two things fall out of it: the
+// npx cache gets the REA tarball, and the supervisor writes the manifest that
+// lets a later host boot register all 139 tools without starting REA at all.
+function warmManifest(spec) {
+  const proxy = path.join(repoRoot, 'scripts', 'rea-lazy.mjs');
+  const child = spawn(process.execPath, [proxy], {
+    env: { ...process.env, REA_MCP_SPEC: spec, REA_LAZY_IDLE_MS: '0' },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  return new Promise((resolve) => {
+    let buffer = '';
+    let settled = false;
+    const pending = new Map();
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { child.kill('SIGTERM'); } catch { /* already gone */ }
+      resolve(result);
+    };
+    const timer = setTimeout(() => finish({ error: '超时 180 s' }), 180000);
+    child.on('error', (error) => finish({ error: String(error.message || error) }));
+    child.stderr.on('data', (chunk) => {
+      const text = String(chunk).trim();
+      if (text) text.split('\n').forEach((l) => info(l.replace(/^\[rea-lazy\] /, '')));
+    });
+    child.stdout.on('data', (chunk) => {
+      buffer += chunk;
+      let index;
+      while ((index = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, index).trim();
+        buffer = buffer.slice(index + 1);
+        if (!line) continue;
+        let message;
+        try { message = JSON.parse(line); } catch { continue; }
+        const waiter = pending.get(message.id);
+        if (waiter) { pending.delete(message.id); waiter(message); }
+      }
+    });
+    const call = (message) => new Promise((res) => { pending.set(message.id, res); child.stdin.write(JSON.stringify(message) + '\n'); });
+    (async () => {
+      try {
+        await call({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'setup', version: '0' } } });
+        child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
+        const list = await call({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
+        finish({ count: list.result?.tools?.length ?? 0 });
+      } catch (error) {
+        finish({ error: String(error.message || error) });
+      }
+    })();
+  });
+}
+
 if (warm) {
   head('预热 REA（首次要下包，可能一两分钟）');
+  const spec = process.env.REA_MCP_SPEC || 'rea-agents@6.3.0';
   const started = Date.now();
-  const result = run('npx', ['--prefer-offline', '-y', process.env.REA_MCP_SPEC || 'rea-agents@6.3.0', 'mcp', '--help'], {
-    stdio: 'ignore',
-    timeout: 180000,
-  });
+  const warmed = dryRun ? { skipped: true } : await warmManifest(spec);
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
-  if (result.status === 0 || result.skipped) ok('缓存已热（' + seconds + ' s）');
-  else warn('预热没成功（' + seconds + ' s）——检查网络或代理，REA 起不来的话模式仍然可选，只是没有工具');
+  if (warmed.skipped) info('would warm ' + spec);
+  else if (warmed.error) warn('预热没成功（' + seconds + ' s）：' + warmed.error + ' ——检查网络或代理；模式仍然可选，只是没有 REA 工具');
+  else ok('拿到 ' + warmed.count + ' 个工具，清单已缓存（' + seconds + ' s）——之后宿主启动不再拉起 REA，第一次真正用到工具才起');
 }
 
 // ── 5. 校验 ────────────────────────────────────────────────────────────────

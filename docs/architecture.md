@@ -217,13 +217,13 @@ const evaluate = new Function("ctx", "expr", "with (ctx) { return eval(expr) }")
 
 | # | 位置 | 改动 |
 |---|---|---|
-| 1 | 新增 `mcp-rea` | `npx --prefer-offline -y rea-agents@6.3.0 mcp`，工具名 `mcp__rea__<name>`，仅本子树可见 |
+| 1 | 新增 `mcp-rea` | 指向本包的 lazy 转接层 `scripts/rea-lazy.mjs`（见 §11），工具名 `mcp__rea__<name>`，仅本子树可见 |
 | 2 | 新增 `tool-presentation` | `mode: native`。REA 约 139 个工具在 `ptc` 下会折叠成代码调用面；不少部署默认 `ptc`，所以显式钉住而不是继承 |
 | 3 | `persona.config.prefix` | 逆向分析师人设 |
 | 4 | `skill-filesystem.config.bundledSkillDir` | 自解析到本仓 `skills/`（默认的 `customSkillDirs` 已删） |
 
 `mcp-rea` 单独带 `failOnStartupError: false`：npx 冷启动/离线时，代价应该是「这个模式没有 REA 工具」，
-而不是「整个 preset 变 broken，一个逆向会话都开不了」。
+而不是「整个 preset 变 broken，一个逆向会话都开不了」。转接层自己的生命周期见 §11。
 
 ---
 
@@ -241,3 +241,71 @@ npm run verify      # 会打印 added-over-standard / missing-versus-standard �
 历史跳版经验（0.1.5-rc.3 → 0.2.0-rc.2）：`workflow-worker-thread` 已换成 `workflow-ptc`；
 新增 `tool-plugin-manager`（disabled）；`tool-ralph` 变为 disabled。这类变化不会报错，
 只会让 preset 静默少功能——所以升级后务必跑一次 `verify`。
+
+---
+
+## 11. 引擎的生命周期：lazy 转接层
+
+### 11.1 为什么不能直接连 REA
+
+`@deepseek-ai/dsh-mcp-client` 是**挂载即连**的。宿主侧证据
+（`node_modules/@deepseek-ai/dsh-mcp-client/lib/index.js`，0.2.0-rc.2）：
+
+```js
+async function apply(ctx, config) {            // :809
+  await startConnection(ctx, config, reconnect) // :822  ← 模块一装上就 spawn
+  ctx.effect(() => dispose, "mcp-client.connection") // :830
+}
+```
+
+没有 idle 计时器、没有「第一次调用再连」的开关，配置项只有
+`transport / serverName / command / args / env / cwd / toolCallTimeoutMs / failOnStartupError / reconnect / maxInstructionBytes`。
+所以只要 `command` 写的是 `npx`，代价就是：**开着 dsh 就有一个 REA 常驻**，哪怕一整天没开逆向会话。
+实测那一对进程（`npm exec rea-agents@6.3.0 mcp` + `node …/.bin/rea mcp`）跑了 2 小时 58 分，父进程是桌面 App。
+
+### 11.2 转接层做了什么
+
+`scripts/rea-lazy.mjs` 自己在 stdin/stdout 上说 MCP（newline-delimited JSON-RPC 2.0），把宿主和 REA 隔开：
+
+```text
+宿主 ──stdin/stdout── 转接层 ──(首次真实请求才 spawn)── npx --prefer-offline -y rea-agents@6.3.0 mcp
+                        │
+                        └─ 缓存 <dsh home>/cache/dsh-rea-reverse-preset/manifest-<spec>.json
+```
+
+| 阶段 | 行为 |
+|---|---|
+| cold（有缓存） | `initialize` / `tools/list` / `prompts/list` / `resources*/list` 从缓存清单直接回答，139 个工具照常注册，REA 进程为 0 |
+| 首次真实请求 | `tools/call` 等先入队 → spawn REA → 重放 `initialize`+`notifications/initialized` → 分页刷新清单并写缓存 → 队列打出去 |
+| idle | `REA_LAZY_IDLE_MS`（默认 10 min）无流量 → 停 REA，回 cold；下一次调用重新拉起 |
+| 启动失败 | `failOnStartupError: false` 兜底，模式仍可选 |
+
+实测（本机，`ELECTRON_RUN_AS_NODE=1` 拉起同一份代码）：
+
+```text
+[rea-lazy] initialize answered from manifest (REA not started)
+initialize 52 ms → 6.3.0        tools/list 22 ms → 139 个
+new REA pids after manifest-only handshake: NONE (lazy confirmed)
+[rea-lazy] starting REA … REA ready in 1.6s
+first call answered ok          | new pids while hot: <npx>:…, <node>:…
+[rea-lazy] idle for 6s — stopping REA
+new REA pids after idle: NONE (auto-stop clean)
+```
+
+### 11.3 三个非显然的决定
+
+- **`command: process.execPath`**，不是 `npx`、也不是 `node`。宿主自己的运行时就是最可靠的解释器：
+  dsh-tui / headless 下是 node，桌面 App 下是 Electron 二进制——后者需要 `ELECTRON_RUN_AS_NODE=1`
+  （已实测：`ELECTRON_RUN_AS_NODE=1 "<App>/Contents/MacOS/DeepSeek Harness" script.mjs` 正常执行）。
+  这样不依赖 PATH 里有没有第二个 node。
+- **`detached: true` + 进程组信号**。`npx` 是包装进程，真正的 `rea mcp` 是它的子进程；只对 `npx` 发
+  SIGTERM 会留下孤儿引擎——正好是这层要消灭的现象。所以 spawn 时放进独立进程组，停止时
+  `process.kill(-pid, signal)`，SIGTERM 之后 3 s 再补 SIGKILL。
+- **清单缓存必须带 spec 指纹**。换 `REA_MCP_SPEC` 时旧清单会少/多工具，所以文件名是
+  `manifest-<slug(spec)>.json`，读的时候再核一次文件里的 `spec` 字段，不匹配就重建。
+
+### 11.4 首次启动仍会拉起一次
+
+全新机器没有清单，缓存就是「怎么知道有 139 个工具」的唯一来源，所以第一次	extbf{必须}拉起一次 REA 来采样。
+把这一步前置即可：`npm run setup -- --warm` 会自己跑一遍握手（顺便下好 npx 那份包），
+之后每次宿主启动都是零引擎。

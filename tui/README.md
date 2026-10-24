@@ -55,7 +55,7 @@ config-changed: persona, skill-filesystem
 | # | 位置 | 改动 |
 |---|---|---|
 | 1 | `persona.config.prefix` | 逆向工程分析师人设（与桌面 bundle 逐字一致） |
-| 2 | 新增 `mcp-rea` | `npx --prefer-offline -y rea-agents@6.3.0 mcp` → 工具名 `mcp__rea__<name>`，只在本 preset 作用域可见 |
+| 2 | 新增 `mcp-rea` | 指向本包 `scripts/rea-lazy.mjs`（lazy 转接层，见 `docs/architecture.md` §11）→ 工具名 `mcp__rea__<name>`，只在本 preset 作用域可见 |
 | 3 | `skill-filesystem.config.bundledSkillDir` | `!!js` 自解析到仓库根的 `skills/`（必须是绝对路径：相对的 `config` 路径没有任何组件会解析，会落到 `process.cwd()`） |
 | 4 | 末尾 `tool-presentation` | `mode: native`：REA 的 139 个工具在 `ptc` 下会折叠成代码调用面 |
 
@@ -80,8 +80,10 @@ dsh-tui           # 或 dst
 
 ## 可用性与限制
 
-- **挂载是 eager**：声明一注册，registry 就把子树 mount 起来。于是每次启动都会拉起一次 REA
-  （npx 热 `~1.4 s`、冷 `~3.7 s`）。旧 README 说的「dsh-tui 惰性挂载、不用就不花钱」只对目录名册那条线成立。
+- **挂载是 eager，引擎不是**：声明一注册，registry 就把子树 mount 起来，所以 `mcp-rea` 那一行的
+  进程每次启动都在；但它连的是本包的转接层，只回答 `initialize` / `tools/list`（清单从缓存读），
+  REA 要等第一次真实 `tools/call` 才拉起，静默 10 分钟后自行退出。
+  旧 README 说的「dsh-tui 惰性挂载、不用就不花钱」只对目录名册那条线成立，而转接层把它也覆盖了。
 - REA 的 139 个工具都会注册，但依赖具体引擎的工具要引擎在场才真能用。
 - `failOnStartupError: false`：npx 慢/无网/REA 报错时 preset 不会变 broken，
   后果是「模式照常可选，但 REA 工具数为 0」。`/mcp` 是第一个能看出来的地方。
@@ -108,10 +110,10 @@ npm run verify            # 全量：结构、可移植性、twin 同构、宿�
 |---|---|---|
 | 声明行 | `~/.dsh/profiles/dsh-tui/cordis.patch.yml` | id/name/description/order + include 路径 |
 | 组合正文 | `cordis.patch.yml` | 改这里，然后 `npm run sync:tui` |
-| REA 版本 | `cordis.patch.yml` 的 `mcp-rea.args` | pin `rea-agents@6.3.0`（npx 缓存目录名是 spec 的哈希），可用 `REA_MCP_SPEC` 覆盖 |
+| REA 版本 | `cordis.patch.yml` 的 `mcp-rea.env.REA_MCP_SPEC` + `scripts/rea-lazy.mjs` 的默认值 | pin `rea-agents@6.3.0`（npx 缓存目录名是 spec 的哈希），可用 `REA_MCP_SPEC` 覆盖 |
 | `--prefer-offline` | 同上 | 不要删：裸 `npx -y` 在热缓存 + registry 不可达时实测约 71 s，超过 MCP SDK 的 60 s 请求超时 → 静默丢掉全部工具 |
 | Hopper 路径 | 同上 `mcp-rea.env` | 从环境变量读，**不要设成空串** |
-| `args` 只能有一个位置参数 | 同上 | `mcp` 必须是传给 REA bin 的唯一参数，多一个 flag 会掉进 CLI 分支 |
+| `mcp` 必须是唯一位置参数 | `scripts/rea-lazy.mjs` 的 `startChild()` | 传给 REA bin 多一个 flag 会掉进 CLI 分支 |
 | YAML 表达式 | 全文 `!!js` | 纯量表达式；反引号开头的模板字符串会被 YAML 当保留指示符，解析直接失败 |
 | `bundledSkillDir` | `skill-filesystem` 行 | `!!js` 自解析，移动仓库后无需改；解析失败时该键被丢弃（静默少一个技能） |
 | 基座同步 | 整份组合 | 宿主升级后与 `standard.patch.yml` 重新 diff，见 `docs/architecture.md` §10 |

@@ -133,17 +133,17 @@ function hostPackage() {
 const isCheckout = fs.existsSync(path.join(repoRoot, '.git'));
 const host = hostPackage();
 
-// `dsh` 的入口是 `if (import.meta.main) await runCli()`（lib/bin.js 末尾）。Node 23.x
-// 与 24.2 之前的版本没有这个属性，CLI 于是什么都不做却返回 0 —— 看起来装成功，
-// 实际没装。所以“有没有 dsh 命令”必须连同运行它的 Node 是否支持 dispatch 一起看。
-const cliDispatch = typeof import.meta.main !== 'undefined';
-const hasDshCli = cliDispatch && capture('dsh', ['--version']).status === 0;
+// `dsh` 的入口是 `if (import.meta.main) await runCli()`（lib/bin.js 末尾）。Node 23.x 与
+// 24.2 之前的版本没有这个属性，CLI 什么都不做却返回 0 —— 看着装成功，实际没装。它跑在
+// PATH 上的 node 里（shebang `#!/usr/bin/env node`），跟我们这一层 node 未必是同一个，
+// 所以判据只能用行为：`dsh --version` 到底有没有吐出东西。
+const nodeOnPath = capture('node', ['--version']).stdout.trim();
+const hasDshCli = capture('dsh', ['--version']).stdout.trim().length > 0;
 if (host) ok('dsh ' + host.version + '  (' + host.file + ')');
-else if (hasDshCli) ok('dsh CLI 在 PATH 上（版本没读到）');
 else warn('PATH 上没有 dsh 命令（软链方式仍然可用；dsh plugin 方式不可用）');
-if (host && !cliDispatch) {
-  warn('当前 Node ' + process.versions.node + ' 缺 import.meta.main，dsh 命令行会静默退出（exit 0 却什么都没做）');
-  line('       要用 dsh plugin 安装，换 Node >= 22.18 / >= 24 再跑；或改成 checkout 软链方式。');
+if (host && !hasDshCli) {
+  warn('`dsh --version` 什么都不打印：它跑在缺 import.meta.main 的 Node 上（PATH 上是 ' + (nodeOnPath || '未知') + '）');
+  line('       dsh plugin 会静默退出、exit 0 却什么都没装。换 Node >= 22.18 / >= 24，或改用 checkout 软链方式。');
 }
 
 if (isCheckout) ok('来源：git checkout ' + repoRoot + ' -> 软链安装，改代码即时生效');
@@ -185,15 +185,23 @@ if (checkOnly) {
     }
   } else if (!hasDshCli) {
     fail('不在 checkout 里，又没法用 dsh CLI：装不了。');
-    line(host && !cliDispatch
-      ? '       原因：当前 Node ' + process.versions.node + ' 缺 import.meta.main，dsh 命令行空转。换 Node >= 22.18 / >= 24 再跑。'
-      : '       原因：PATH 上没有 dsh 命令。手动装：dsh plugin --profile <name> add ' + pkg.name + '。');
+    line(host
+      ? '       原因：`dsh --version` 没有输出，CLI 在 PATH 上的 ' + (nodeOnPath || '未知') + ' 里空转。换 Node >= 22.18 / >= 24 再跑。'
+      : '       原因：PATH 上没有 dsh。手动装：dsh plugin --profile <name> add ' + pkg.name + '。');
     problems += 1;
   } else if (!dryRun) {
     for (const dir of found) {
       if (installedIn(dir)) { ok(dir + ' 已装，跳过'); continue; }
       const result = run('dsh', ['plugin', '--profile', dir, 'add', pkg.name + '@' + pkg.version]);
-      if (result.status !== 0) { fail('dsh plugin --profile ' + dir + ' add 失败'); problems += 1; }
+      if (result.status !== 0) { fail('dsh plugin --profile ' + dir + ' add 失败'); problems += 1; continue; }
+      // 返回 0 不等于装上了：CLI 空转、或这个包名在 registry 上还不存在，都是 0。
+      if (!installedIn(dir)) {
+        fail('dsh plugin --profile ' + dir + ' add 返回 0，但 profile 里没有 ' + pkg.name);
+        line('       多半是包名还没发布（' + pkg.name + '@' + pkg.version + ' 取不到），或那层 node 缺 import.meta.main。');
+        problems += 1;
+        continue;
+      }
+      ok(dir + ' 装上');
     }
   }
 }

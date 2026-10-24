@@ -78,8 +78,11 @@
 - `bundledSkillDir` 去掉 `process.cwd()` 候选：从 npm 安装后的包里跑校验时，这个兜底会
   猜出一个真实路径，与「落空就丢弃该键」的设计相反。现在只看组合锚点
   （`ctx.baseUrl`：已装包 → 邻近 `../skills/`），启动目录不再决定技能是否加载。
-- `scripts/setup.mjs` 增加 `import.meta.main` 探测：Node 23.x 里 `dsh` 的入口守卫不成立，
-  `dsh plugin` 会静默 exit 0 而什么都没做。现在提前告警，并在 npm 安装通道上把原因写清楚。
+- `scripts/setup.mjs` 的 CLI 探测改为看行为（`dsh --version` 有没有输出）：`dsh` 的入口是
+  `if (import.meta.main) await runCli()`，Node 23.x / 24.2 之前没有该属性，`dsh plugin` 会
+  静默 exit 0 而什么都没做；它跑在 PATH 上的 node 里，与本脚本自身的 node 未必同一个。
+  另外 `dsh plugin add` 返回 0 之后会复核 profile 里是否真有这个包，没装上就报错——
+  空转和「包还没发布」都能当场看见，而不是被写成「安装成功」。
 
 ### 验证（发布前实测）
 
@@ -89,6 +92,9 @@
   初始化、`dsh.profile.bundles` 自动追加、`loadProfileDirectory` 组合出
   `preset reverse / 21 plugin rows`、`skippedBundles: []`。
 - 从安装副本（不是 checkout）跑 `scripts/verify.mjs`：RESULT PASS，39 项全过。
+- `dsh plugin --profile web remove` 与「装完再复核」两条路径实测：无输出 CLI → 安装前就被拦；
+  假装有版本、add 空转的 CLI → `add 返回 0，但 profile 里没有 …`；把包名换成 tarball 模拟已发布
+  → pnpm 装好、`dsh.profile.bundles` 自动追加、`verify` 与 `verify:profiles` 全 PASS。
 - 从安装副本跑转接层（`process.execPath` + 相对锚点解析）：冷启动拉起 REA 1.4 s、
   139 个工具入清单；热启动 `initialize` 61 ms / `tools/list` 80 ms，零 REA 进程。
 

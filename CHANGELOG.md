@@ -14,9 +14,12 @@
   会额外命中「数据处理」，与逆向模式无关）。
 - 新增 `scripts/market-check.mjs`（`npm run market:check`）：走商店自己的代码路径
   （装了 dsh-plugin-hub 时直接调用其 `GitHubClient` 与 `scanPlugin`），体检包形状、
-  商店元数据、安全扫描、GitHub 侧、镜像发现、社区总目录与 npm 七个环节。
+  商店元数据、商店归属、安全扫描、GitHub 侧、镜像发现、社区总目录与 npm 八个环节。
 - 新增 `docs/market.md`：商店的三个数据源（mirror / catalog / seed）、
   「发布」按钮实际做了什么、当前收录状态与提高曝光的方式。
+- `scripts/install.mjs` 除了软链与 `dsh.profile.bundles`，还会在 profile 的 `dependencies` 里记一条 `file:<仓库路径>`：商店正是按这个规格把插件归到**自创作插件**
+  （`isLocalSpec`），否则「发布」按钮看不到它。`--uninstall` 两份一起清。
+- `market-check.mjs` 增加「商店归属（自创作）」一节，逐个 profile 报告规格与解析结果。
 - 两个 README 的徽章改成**引用式**：商店详情页会把 README 里每张内联图片当成截图，
   五个 shields 徽章会占满截图位。
 

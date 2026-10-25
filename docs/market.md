@@ -23,6 +23,23 @@ DSH 的「插件商店」是第三方包 **dsh-plugin-hub** 提供的界面。�
 因为本仓库早已存在并推送，这一步等价于「补 topic + 补 release + 发 npm」，没有额外的注册动作。
 换句话说：**商店里能不能看到你，取决于上面那张表，而不是取决于你有没有点过发布按钮。**
 
+## 商店里怎么「看到自己」
+
+商店把插件分两个标签页：**自创作插件**（代码在你机器上，能直接点发布）和**下载插件**。
+判据不是发布状态，而是 **profile 的 `dependencies` 规格**：`file:` / `link:` / `workspace:`
+开头就算自创作（hub `lib/host/index.js` 的 `isLocalSpec`，配合
+`myPlugins()` 的 `category === 'own'` 过滤）。
+
+而启动时决定装不装的是另一份东西 —— `dsh.profile.bundles` 里的**裸包名**。两个清单
+服务两个读者，都不能省：
+
+| 清单 | 读者 | 该写什么 |
+|---|---|---|
+| `dsh.profile.bundles` | 启动加载器（`resolveBundleDir` 只按裸名从 `node_modules` 解析） | `dsh-rea-reverse-preset` |
+| `dependencies` | 插件商店（判自创作）、npm/pnpm（建链接） | `file:/Users/jiewang/Desktop/Code/rea-dsh` |
+
+`npm run link:all`（= `scripts/install.mjs --all`）两份都会写，`--uninstall` 两份都会清。
+
 ## 本仓库的现状
 
 | 项 | 状态 |
@@ -31,6 +48,7 @@ DSH 的「插件商店」是第三方包 **dsh-plugin-hub** 提供的界面。�
 | 仓库 topics（含 `dsh-plugin`） | ✅ 13 个 |
 | `displayName` / keywords → 分类 | ✅ 标题「逆向工程模式 · Reverse Engineering」，分类 工具 / Agent / 开发 |
 | `v1.0.0` release | ✅ 与 package.json 版本对齐 |
+| 商店「自创作插件」可见 | ✅ 四个 profile 的 `dependencies` 都记了 `file:` 规格，可直接点发布 |
 | mirror（前 300） | ⚠️ 未进入：`topic:dsh-plugin` 命中上万个仓库，新仓库排不进去 |
 | catalog（Blue-Whale 总目录） | ⚠️ 已提交 [issue #185](https://github.com/leenkcool/Blue-Whale-Harness/issues/185)，等维护者写入 `repos.txt` |
 | npm | ⚠️ 未发布：发布后商店改从 registry 安装（`hasNpm: true`），比 git clone 快 |
@@ -42,7 +60,7 @@ npm run market:check
 ```
 
 它走的是商店自己的代码路径（装了 dsh-plugin-hub 时直接调用它的 `GitHubClient` 与
-`scanPlugin`），打印七节体检：包形状 / 商店里长什么样 / 安全扫描 / GitHub 侧 /
+`scanPlugin`），打印八节体检：包形状 / 商店里长什么样 / 商店归属（自创作）/ 安全扫描 /
 市场发现 / 社区总目录 / npm，最后给 `RESULT`。阻塞项（缺 `dsh.bundle.patch`、缺 topic、
 仓库私有…）返回退出码 1。
 

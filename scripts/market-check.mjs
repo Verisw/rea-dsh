@@ -12,7 +12,7 @@
  * 本脚本只读：本地元数据 + GitHub API + npm registry，输出一份上线前体检。
  * 退出码：0 = 可以上线，1 = 有阻塞项。
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join, resolve, dirname } from 'node:path';
@@ -134,8 +134,62 @@ function checkStoreMetadata() {
   else warn('没有 README.md', '详情页会没有介绍');
 }
 
+/**
+ * 商店把「自己写的插件」和「下载的插件」分两个标签页。判据不是发布状态，而是
+ * profile package.json 的 dependencies 规格：file: / link: / workspace: 开头
+ * 就算自创作（hub lib/host/index.js 的 isLocalSpec）。而启动时真正决定装不装
+ * 的是 dsh.profile.bundles 里的裸包名 —— 两个清单服务两个读者，缺一个都不行。
+ */
+function checkOwnership() {
+  console.log('== 3. 商店归属（自创作插件） ===');
+  const home = process.env.DSH_HOME || join(process.env.HOME || '', '.dsh');
+  const root = join(home, 'profiles');
+  if (!existsSync(root)) {
+    info('没有 profile 目录', root);
+    return;
+  }
+  const isLocalSpec = (spec) => /^(?:file:|link:|workspace:)/.test(String(spec || ''));
+  const rows = [];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const file = join(root, entry.name, 'package.json');
+    if (!existsSync(file)) continue;
+    let manifest;
+    try {
+      manifest = JSON.parse(readFileSync(file, 'utf8'));
+    } catch {
+      continue;
+    }
+    const bundles = (manifest.dsh && manifest.dsh.profile && manifest.dsh.profile.bundles) || [];
+    if (!bundles.includes(pkg.name)) continue;
+    const spec = (manifest.dependencies || {})[pkg.name];
+    let resolves = false;
+    try {
+      createRequire(join(root, entry.name, 'noop.js')).resolve(pkg.name + '/package.json');
+      resolves = true;
+    } catch {
+      resolves = false;
+    }
+    rows.push({ profile: entry.name, spec, local: isLocalSpec(spec), resolves });
+  }
+  if (rows.length === 0) {
+    info('没有 profile 装了这个包', '先跑 npm run setup（或 scripts/install.mjs --all）');
+    return;
+  }
+  const own = rows.filter((row) => row.local && row.resolves);
+  if (own.length > 0) {
+    pass('会列在「自创作插件」下', own.map((row) => row.profile).join(', ') + ' —— 商店可直接点发布');
+  } else {
+    warn('不会算作自创作插件', 'profile 的 dependencies 里缺 ' + pkg.name + ' 的 file: 规格；重跑 install 即可补上');
+  }
+  for (const row of rows) {
+    const state = row.local && row.resolves ? '自创作（可发布）' : '下载插件';
+    info(row.profile, (row.spec || '（dependencies 里没有此条目）') + ' → ' + state);
+  }
+}
+
 async function checkSecurity() {
-  console.log('== 3. 市场安全扫描 ===');
+  console.log('== 4. 市场安全扫描 ===');
   const hub = findHub();
   if (!hub) { info('未找到 dsh-plugin-hub', '跳过（改用 verify 的静态检查）'); return; }
   try {
@@ -154,7 +208,7 @@ async function checkSecurity() {
 }
 
 async function checkGithub() {
-  console.log('== 4. GitHub 侧 ===');
+  console.log('== 5. GitHub 侧 ===');
   const json = tryRun('gh', ['repo', 'view', REPO, '--json', 'visibility,description,repositoryTopics,latestRelease']);
   if (!json) { fail('读不到仓库信息', 'gh 未登录或仓库不存在'); return; }
   const repo = JSON.parse(json);
@@ -173,7 +227,7 @@ async function checkGithub() {
 }
 
 async function checkDiscovery() {
-  console.log('== 5. 市场发现（mirror） ===');
+  console.log('== 6. 市场发现（mirror） ===');
   const token = tryRun('gh', ['auth', 'token']);
   const hub = findHub();
   let hits = null;
@@ -201,12 +255,12 @@ async function checkDiscovery() {
   if (rank >= 0) pass('已进入市场镜像列表', '第 ' + (rank + 1) + ' / ' + hits.length + ' 位');
   else {
     warn('不在镜像前 ' + hits.length + ' 条里', 'topic:dsh-plugin 命中上万个仓库，0 star 新仓库排不进去');
-    info('补救', '走社区总目录（见第 6 节）+ 攒 star，或让用户用 dsh plugin add 直接装');
+    info('补救', '走社区总目录（见第 7 节）+ 攒 star，或让用户用 dsh plugin add 直接装');
   }
 }
 
 async function checkCatalog() {
-  console.log('== 6. 社区总目录（catalog） ===');
+  console.log('== 7. 社区总目录（catalog） ===');
   let text = null;
   try {
     const res = await fetch(CATALOG_URL, { signal: AbortSignal.timeout(15000) });
@@ -220,7 +274,7 @@ async function checkCatalog() {
 }
 
 async function checkNpm() {
-  console.log('== 7. npm ===');
+  console.log('== 8. npm ===');
   let meta = null;
   try {
     const res = await fetch('https://registry.npmjs.org/' + encodeURIComponent(pkg.name), { signal: AbortSignal.timeout(10000) });
@@ -235,6 +289,7 @@ async function main() {
   console.log('');
   checkPackaging();
   checkStoreMetadata();
+  checkOwnership();
   await checkSecurity();
   await checkGithub();
   await checkDiscovery();

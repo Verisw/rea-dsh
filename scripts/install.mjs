@@ -8,9 +8,18 @@
  *   node scripts/install.mjs --all               # every profile that exists
  *   node scripts/install.mjs --all --uninstall   # remove
  *
- * For each target profile it does two things, both idempotent:
+ * For each target profile it does three things, all idempotent:
  *   1. symlink <profile>/node_modules/<pkg> -> this repo root
  *   2. append <pkg> to dsh.profile.bundles in the profile's package.json
+ *   3. record "file:<repo root>" in the profile's dependencies
+ *
+ * Step 3 is what the plugin store (dsh-plugin-hub) reads: it classifies a
+ * plugin as 自创作 when the profile's dependencies spec starts with
+ * file:, link: or workspace: (hub lib/host/index.js, isLocalSpec). Without
+ * it the store only lists this plugin under 下载插件 and the 发布 button
+ * cannot see it. A bare name in dsh.profile.bundles stays the only thing
+ * the boot loader resolves, so the two lists serve different readers and
+ * neither can replace the other.
  *
  * The bundle patch is applied at boot: restart the owning surface afterwards
  * (desktop app, "dsh web", "dsh", or dsh-tui).
@@ -127,6 +136,13 @@ function apply(dir) {
     } else {
       console.log('  dsh.profile.bundles already clean');
     }
+    if (profilePkg.dependencies && name in profilePkg.dependencies) {
+      delete profilePkg.dependencies[name];
+      changed = true;
+      console.log('  removed ' + name + ' from dependencies');
+    } else {
+      console.log('  dependencies already clean');
+    }
   } else {
     fs.mkdirSync(path.dirname(linkPath), { recursive: true });
     const existing = fs.lstatSync(linkPath, { throwIfNoEntry: false });
@@ -153,6 +169,15 @@ function apply(dir) {
       bundles.push(name);
       changed = true;
       console.log('  added ' + name + ' to dsh.profile.bundles');
+    }
+    const spec = 'file:' + repoRoot;
+    const dependencies = (profilePkg.dependencies ??= {});
+    if (dependencies[name] === spec) {
+      console.log('  dependencies already records ' + spec);
+    } else {
+      dependencies[name] = spec;
+      changed = true;
+      console.log('  recorded ' + name + ' -> ' + spec + ' in dependencies');
     }
   }
 

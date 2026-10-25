@@ -74,6 +74,8 @@ npm run setup -- --uninstall                  # 从所有界面卸掉
 node scripts/install.mjs
 ```
 
+用本地 checkout 装的话，插件商店（dsh-plugin-hub）会把它列在**自创作插件**里，「发布」按钮能直接推到 GitHub / npm；公开列表里能不能搜到是另一回事，见 [docs/market.md](docs/market.md)。
+
 ```text
 profiles under /Users/you/.dsh/profiles:
   desktop   installed

@@ -78,6 +78,8 @@ Check what is installed:
 node scripts/install.mjs
 ```
 
+A local checkout install also shows up in the plugin store (dsh-plugin-hub) under **your own plugins**, where its publish button can push it to GitHub/npm. Being visible in the *public* store list is a separate matter — see [docs/market.md](docs/market.md) (zh).
+
 ## Use
 
 1. Restart that surface.

@@ -2,11 +2,7 @@
 
 **简体中文** · [English](README.md) · [架构说明](docs/architecture.md) · [排障手册](docs/troubleshooting.md) · [更新日志](CHANGELOG.md)
 
-[![verify](https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml/badge.svg)](https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![node](https://img.shields.io/badge/node-%E2%89%A520.16-brightgreen.svg)](package.json)
-[![dsh](https://img.shields.io/badge/dsh-0.2.0--rc.2%20%E2%80%A6%200.3-blueviolet.svg)](docs/architecture.md)
-[![tools](https://img.shields.io/badge/REA%20tools-139-informational.svg)](https://github.com/morluto/rea)
+[![verify][badge-verify]][ci] [![license][badge-license]][license-file] [![node][badge-node]][pkg-json] [![dsh][badge-dsh]][arch-doc] [![REA tools][badge-tools]][rea-repo]
 
 给 **DeepSeek Harness（dsh）** 加一个「逆向工程模式」。
 
@@ -134,6 +130,7 @@ npm run unlink:all        # 本地软链安装的用这个
 | 技能没挂上 | 包路径被移动过，或 profile 里同时装了两份。 |
 | 改了配置不生效 | dsh 只在启动时读取这些设置，必须重启进程。 |
 | 没开逆向模式却有个 `rea mcp` 进程 | 老版本装的是直连版（启动即拉起），或设了 `REA_LAZY_MODE=eager`。 |
+| 插件商店里搜不到 | 商店列表来自 GitHub 的 `topic:dsh-plugin` 搜索结果，见 [docs/market.md](docs/market.md)。 |
 
 逐条排查步骤见 [docs/troubleshooting.md](docs/troubleshooting.md)。
 
@@ -144,8 +141,24 @@ npm run unlink:all        # 本地软链安装的用这个
 - 宿主版本要求 `@deepseek-ai/dsh >=0.2.0-rc.2 <0.3.0-0`。超出区间时本包会被跳过并给出提示，
   而不是把你的组合改坏。
 - 装了什么、为什么这么装、`!!js` 求值环境与兼容性门槛，见 [docs/architecture.md](docs/architecture.md)。
+- 商店里的标题、分类、截图从哪来，以及列表是怎么被发现的，见 [docs/market.md](docs/market.md)；
+  `npm run market:check` 会打印一份上线体检。
 
 ## 许可
 
 MIT（见 [LICENSE](LICENSE)）。本包调用 [REA](https://github.com/morluto/rea)（MIT），不打包其代码；
 Ghidra / Hopper / IDA 各自独立授权，本包不附带也不代管。
+
+<!-- Badge sources. Reference-style on purpose: the plugin store turns every inline
+     markdown image in a README into a "screenshot", and five shields would fill that tab. -->
+
+[ci]: https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml
+[badge-verify]: https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml/badge.svg
+[license-file]: LICENSE
+[badge-license]: https://img.shields.io/badge/license-MIT-blue.svg
+[pkg-json]: package.json
+[badge-node]: https://img.shields.io/badge/node-%E2%89%A520.16-brightgreen.svg
+[arch-doc]: docs/architecture.md
+[badge-dsh]: https://img.shields.io/badge/dsh-0.2.0--rc.2%20%E2%80%A6%200.3-blueviolet.svg
+[rea-repo]: https://github.com/morluto/rea
+[badge-tools]: https://img.shields.io/badge/REA%20tools-139-informational.svg

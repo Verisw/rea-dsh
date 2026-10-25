@@ -1,14 +1,22 @@
 {
   "name": "dsh-rea-reverse-preset",
   "version": "1.0.0",
+  "displayName": "逆向工程模式 · Reverse Engineering",
   "description": "逆向工程模式 for DeepSeek Harness: one preset that mounts ~139 REA tools (Ghidra / Hopper / IDA), a reverse-engineer persona, and an evidence-first analysis workflow.",
   "keywords": [
     "dsh",
     "dsh-plugin",
     "dsh-bundle",
     "deepseek-harness",
+    "agent",
     "agent-preset",
+    "preset",
+    "tool",
+    "cli",
+    "debugger",
     "reverse-engineering",
+    "disassembler",
+    "decompiler",
     "rea",
     "mcp",
     "ghidra",
@@ -49,7 +57,8 @@
     "link:tui": "node scripts/install.mjs --profile dsh-tui",
     "link:all": "node scripts/install.mjs --all",
     "unlink:all": "node scripts/install.mjs --all --uninstall",
-    "publish:check": "node scripts/publish-check.mjs"
+    "publish:check": "node scripts/publish-check.mjs",
+    "market:check": "node scripts/market-check.mjs"
   },
   "publishConfig": {
     "access": "public"

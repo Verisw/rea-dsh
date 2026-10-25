@@ -3,6 +3,23 @@
 所有值得注意的改动都记在这里。格式参考 [Keep a Changelog](https://keepachangelog.com/)，
 版本号遵循 [SemVer](https://semver.org/)。
 
+## [Unreleased]
+
+### 上架插件市场
+
+- 仓库补上发现用的 topics：`dsh-plugin`（商店只认这个）、`dsh-preset`、`agent-preset`、
+  `cordis-plugin`。没有 `dsh-plugin` 的仓库不会被商店的 GitHub 搜索命中。
+- `package.json` 增加 `displayName`（商店标题），并调整 keywords，
+  使 `deriveCategories()` 推出「工具 / Agent / 开发」三类（原先的 `static-analysis`
+  会额外命中「数据处理」，与逆向模式无关）。
+- 新增 `scripts/market-check.mjs`（`npm run market:check`）：走商店自己的代码路径
+  （装了 dsh-plugin-hub 时直接调用其 `GitHubClient` 与 `scanPlugin`），体检包形状、
+  商店元数据、安全扫描、GitHub 侧、镜像发现、社区总目录与 npm 七个环节。
+- 新增 `docs/market.md`：商店的三个数据源（mirror / catalog / seed）、
+  「发布」按钮实际做了什么、当前收录状态与提高曝光的方式。
+- 两个 README 的徽章改成**引用式**：商店详情页会把 README 里每张内联图片当成截图，
+  五个 shields 徽章会占满截图位。
+
 ## [1.0.0] - 2026-10-24
 
 首个公开版本。

@@ -2,11 +2,7 @@
 
 **English** · [简体中文](README.zh-CN.md) · [Architecture](docs/architecture.md) · [Troubleshooting](docs/troubleshooting.md) · [Changelog](CHANGELOG.md)
 
-[![verify](https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml/badge.svg)](https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![node](https://img.shields.io/badge/node-%E2%89%A520.16-brightgreen.svg)](package.json)
-[![dsh](https://img.shields.io/badge/dsh-0.2.0--rc.2%20%E2%80%A6%200.3-blueviolet.svg)](docs/architecture.md)
-[![tools](https://img.shields.io/badge/REA%20tools-139-informational.svg)](https://github.com/morluto/rea)
+[![verify][badge-verify]][ci] [![license][badge-license]][license-file] [![node][badge-node]][pkg-json] [![dsh][badge-dsh]][arch-doc] [![REA tools][badge-tools]][rea-repo]
 
 > The documents under `docs/` are written in Chinese; this README and the code comments are bilingual.
 
@@ -133,6 +129,7 @@ npm run unlink:all        # when installed through local symlinks
 | Skills not mounted | The package was moved, or two copies are installed in one profile. |
 | Config changes ignored | dsh reads this at startup only; restart the process. |
 | A `rea mcp` process with no reverse session open | An older build that connected directly, or `REA_LAZY_MODE=eager`. |
+| Not listed in the plugin store | The store builds its list from GitHub repos matching `topic:dsh-plugin` — see [docs/market.md](docs/market.md). |
 
 Step-by-step diagnosis: [docs/troubleshooting.md](docs/troubleshooting.md).
 
@@ -144,8 +141,24 @@ Step-by-step diagnosis: [docs/troubleshooting.md](docs/troubleshooting.md).
   notice instead of breaking your composition.
 - How it loads, why it is built this way, the `!!js` evaluation environment and the compatibility gate:
   [docs/architecture.md](docs/architecture.md).
+- Store metadata (title, categories, README screenshots) and how the listing is discovered:
+  [docs/market.md](docs/market.md). `npm run market:check` prints a readiness report.
 
 ## License
 
 MIT — see [LICENSE](LICENSE). This package calls [REA](https://github.com/morluto/rea) (MIT) without bundling
 its code. Ghidra, Hopper and IDA keep their own licenses; none is shipped or managed here.
+
+<!-- Badge sources. Reference-style on purpose: the plugin store turns every inline
+     markdown image in a README into a "screenshot", and five shields would fill that tab. -->
+
+[ci]: https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml
+[badge-verify]: https://github.com/Verisw/rea-dsh/actions/workflows/verify.yml/badge.svg
+[license-file]: LICENSE
+[badge-license]: https://img.shields.io/badge/license-MIT-blue.svg
+[pkg-json]: package.json
+[badge-node]: https://img.shields.io/badge/node-%E2%89%A520.16-brightgreen.svg
+[arch-doc]: docs/architecture.md
+[badge-dsh]: https://img.shields.io/badge/dsh-0.2.0--rc.2%20%E2%80%A6%200.3-blueviolet.svg
+[rea-repo]: https://github.com/morluto/rea
+[badge-tools]: https://img.shields.io/badge/REA%20tools-139-informational.svg
